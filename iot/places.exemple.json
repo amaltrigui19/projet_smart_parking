@@ -1,0 +1,13 @@
+{
+  "parking": "P1",
+  "resolution": [640, 480],
+  "places": [
+    {"id": "A1", "type": "normale",    "duree_max_min": 120, "poly": [[40, 60],  [130, 60],  [130, 200], [40, 200]]},
+    {"id": "A2", "type": "normale",    "duree_max_min": 120, "poly": [[140, 60], [230, 60],  [230, 200], [140, 200]]},
+    {"id": "A3", "type": "pmr",        "duree_max_min": 120, "poly": [[240, 60], [330, 60],  [330, 200], [240, 200]]},
+    {"id": "A4", "type": "electrique", "duree_max_min": 60,  "poly": [[340, 60], [430, 60],  [430, 200], [340, 200]]}
+  ],
+  "zones_interdites": [
+    {"id": "allee1", "poly": [[40, 210], [600, 210], [600, 280], [40, 280]]}
+  ]
+}

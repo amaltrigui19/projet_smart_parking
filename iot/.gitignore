@@ -1,0 +1,11 @@
+# Résultats et modèles (recréés automatiquement)
+runs/
+resultats/
+*.pt
+
+# Photos de test (droits d'auteur)
+photos_test/
+
+# Python
+__pycache__/
+venv/

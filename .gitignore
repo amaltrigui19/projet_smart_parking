@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# YOLO
+runs/
+resultats/
+*.pt
+!iot/models/*.pt
+
+# Données locales
+iot/photos_test/
+iot/places.json
+.env
