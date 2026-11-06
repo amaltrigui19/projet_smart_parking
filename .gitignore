@@ -14,3 +14,12 @@ resultats/
 iot/photos_test/
 iot/places.json
 .env
+
+# Serveur (infra/) : certificats, clés et secrets jamais dans Git
+infra/certs/
+infra/certbot-www/
+*.pem
+*.key
+
+# Java
+api/target/
