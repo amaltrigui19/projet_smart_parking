@@ -2,7 +2,28 @@
 
 Rédaction : Maissa · Sprint 1 · Remplace `docs/installation-vm.md` prévu dans `repartition_travail.md`
 
-Le serveur regroupe 4 services, lancés par **un seul fichier** [`infra/docker-compose.yml`](../infra/docker-compose.yml) :
+> **État actuel (vérifié le 6 novembre 2026)**
+>
+> | | |
+> |---|---|
+> | URL | **https://smartparking-supcom.duckdns.org** (page d'accueil Nginx ; l'API arrive au sprint 2) |
+> | Hébergement | AWS EC2, région **eu-north-1** (Stockholm), instance `smart-parking-vm` |
+> | Machine | **t3.small** (2 vCPU, 2 Gio), Ubuntu Server 24.04 LTS, disque 20 Gio gp3 |
+> | Adresse | Elastic IP 13.49.171.243, nom DNS DuckDNS |
+> | Certificat | Let's Encrypt, **expire le 4 février 2027**, renouvelé automatiquement (`certbot.timer`) |
+> | Ports ouverts | **22** (SSH), **80** (HTTP → HTTPS), **443** (HTTPS). Le **8883** (MQTT) sera ouvert au sprint 2 |
+> | Logiciels | Nginx et Certbot installés **directement sur la VM** (paquets apt). Docker n'est pas encore installé |
+
+## 0. Ce qui tourne aujourd'hui, et ce qui tournera au sprint 2
+
+| | **Aujourd'hui sur la VM** (sprint 1) | **Cible** (sprint 2) |
+|---|---|---|
+| Serveur web | Nginx de l'hôte (apt), page par défaut | Conteneur `nginx` de `infra/` : PWA + `/api` |
+| Certificat | `certbot --nginx` : Certbot modifie lui-même la configuration du Nginx de l'hôte | Même certificat `/etc/letsencrypt/`, copié dans `infra/certs/` pour les conteneurs `nginx` et `mqtt` |
+| API, MQTT, base | absents | Conteneurs `wildfly`, `mqtt` (8883), `mongo` |
+| Procédure | [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée) | [section 4](#4-passage-à-la-stack-docker-sur-la-vm-sprint-2) |
+
+La **cible** est le même `docker-compose.yml` que celui testé en local :
 
 ```
                          ┌──────────────── machine (PC ou VM) ────────────────┐
@@ -22,10 +43,10 @@ Raspberry Pi ─MQTT TLS 8883─▶ mqtt (Mosquitto)     mongo (127.0.0.1:27017)
 
 Deux voies, **avec les mêmes fichiers** :
 
-- **Voie B, locale** (en attendant l'accès au cloud) : sur le PC, certificat d'une autorité locale → [section 2](#2-voie-b--environnement-local-docker-desktop).
-- **Voie A, VM cloud** (cible finale) : Ubuntu 24.04, nom DNS, certificat Let's Encrypt → [section 3](#3-voie-a--vm-cloud-ubuntu-2404).
+- **Voie B, locale** : sur le PC, avec un certificat d'une autorité locale → [section 2](#2-voie-b--environnement-local-docker-desktop).
+- **Voie A, VM AWS** : HTTPS déjà en place → [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée), puis la stack Docker au sprint 2 → [section 4](#4-passage-à-la-stack-docker-sur-la-vm-sprint-2).
 
-La seule différence entre les deux est l'origine des fichiers `infra/certs/fullchain.pem` et `privkey.pem`, et la valeur de `DOMAINE` dans `.env`.
+Entre les deux voies, seules changent l'origine des fichiers `infra/certs/fullchain.pem` et `privkey.pem`, et la valeur de `DOMAINE` dans `.env`.
 
 ---
 
@@ -221,271 +242,409 @@ docker compose down -v         # ATTENTION : supprime aussi les données MongoDB
 
 ---
 
-## 3. Voie A : VM cloud (Ubuntu 24.04)
+## 3. Voie A : VM AWS (procédure réellement appliquée)
 
-Les exemples utilisent **Azure** (nom DNS gratuit `*.cloudapp.azure.com`). Les différences pour AWS sont en 3.9.
-Dans les commandes, remplacer `smartparking-supcom.francecentral.cloudapp.azure.com` par votre nom DNS. Pour éviter de le retaper, on le met dans une variable du terminal :
-
-```bash
-DOMAINE=smartparking-supcom.francecentral.cloudapp.azure.com
-```
+Ces étapes ont été suivies le 6 novembre 2026. Les valeurs sont celles de notre VM.
 
 ### 3.1 Prérequis
 
-- Un abonnement Azure (Azure for Students : 100 USD de crédit, sans carte bancaire) ou AWS.
-- Sur le PC : PowerShell avec `ssh` (inclus dans Windows 10 et 11) ; vérifier avec `ssh -V` → `OpenSSH_for_Windows_…`.
-- Une adresse email pour Let's Encrypt (avertissements d'expiration).
+- Un compte AWS. Le nôtre est en plan gratuit, avec 100 USD de crédits valables jusqu'au 6 mai 2027.
+- Sur le PC : PowerShell avec `ssh` (inclus dans Windows). Vérifier avec `ssh -V` → `OpenSSH_for_Windows_…`.
+- Un compte DuckDNS (connexion avec GitHub ou Google), pour avoir un nom de domaine gratuit.
 
-### 3.2 Créer la VM (portail Azure)
+> Pourquoi DuckDNS : Let's Encrypt **refuse** les noms fournis par AWS (`ec2-….compute.amazonaws.com`). Il faut donc un nom de domaine à nous, et DuckDNS en donne un gratuitement.
 
-*Créer une ressource* → *Machine virtuelle* :
+### 3.2 Créer l'instance EC2
+
+Console AWS → région **Europe (Stockholm) eu-north-1** (menu en haut à droite) → **EC2** → **Lancer une instance** :
 
 | Champ | Valeur |
 |---|---|
-| Groupe de ressources | `rg-smartparking` (nouveau) |
-| Nom | `vm-smartparking` |
-| Région | une région autorisée par l'abonnement étudiant, proche de la Tunisie (`France Central`, `West Europe`, `Italy North`) |
-| Image | **Ubuntu Server 24.04 LTS** (x64) |
-| Taille | **Standard_B1ms** (1 vCPU, 2 Go) ; Standard_B2s (2 vCPU, 4 Go) si WildFly manque de mémoire |
-| Authentification | **Clé publique SSH**, utilisateur `azureuser`, nouvelle paire de clés `vm-smartparking_key` |
-| Ports d'entrée publics | SSH (22) (on ajoute les autres en 3.3) |
-| Disque | SSD Standard, 30 Go |
-| Réseau → IP publique | nouvelle, **SKU Standard, statique** |
+| Nom | `smart-parking-vm` |
+| Image (AMI) | **Ubuntu Server 24.04 LTS** (x86) |
+| Type d'instance | **t3.small** (2 vCPU, 2 Gio) |
+| Paire de clés | nouvelle, type RSA, format `.pem` : `smart-parking-key` |
+| Réseau | groupe de sécurité créé par l'assistant (`launch-wizard-1`) : autoriser SSH, HTTP et HTTPS depuis Internet |
+| Stockage | **20 Gio gp3** |
 
-*Vérifier + créer* → *Créer* → **télécharger la clé privée** `vm-smartparking_key.pem` et la ranger dans `C:\Users\<vous>\.ssh\`. Ne jamais la mettre dans le dépôt.
+Le fichier `smart-parking-key.pem` est téléchargé une seule fois. Le ranger dans un dossier personnel **en dehors du dépôt** (noté `<CHEMIN_CLE>` ci-dessous), **jamais dans le dépôt**.
 
-**Nom DNS** : ressource *IP publique* de la VM → *Configuration* → *Étiquette du nom DNS* = `smartparking-supcom` → *Enregistrer*.
-Résultat : le nom `smartparking-supcom.<region>.cloudapp.azure.com` apparaît dans la page *Vue d'ensemble* de la VM.
+Résultat attendu : l'instance passe à l'état **En cours d'exécution** et les vérifications d'état affichent **2/2**.
 
-Vérification depuis PowerShell :
+### 3.3 Adresse IP fixe (Elastic IP)
 
-```powershell
-Resolve-DnsName smartparking-supcom.francecentral.cloudapp.azure.com
-```
+Sans Elastic IP, l'adresse publique change à chaque arrêt et redémarrage de la VM.
 
-Résultat attendu : une ligne `A` avec l'adresse IP publique de la VM.
+EC2 → **Adresses IP Elastic** → **Allouer l'adresse IP Elastic** → **Allouer**. Puis **Actions** → **Associer l'adresse IP Elastic** → instance `smart-parking-vm` → **Associer**.
 
-*Variante en ligne de commande* (Azure CLI, `winget install Microsoft.AzureCLI`, puis `az login`) :
+Résultat : la VM a l'adresse **13.49.171.243**.
 
-```bash
-az group create -n rg-smartparking -l francecentral
-az vm create -g rg-smartparking -n vm-smartparking --image Ubuntu2404 \
-  --size Standard_B1ms --admin-username azureuser --generate-ssh-keys \
-  --public-ip-sku Standard --public-ip-address-dns-name smartparking-supcom \
-  --os-disk-size-gb 30
-```
+> Une adresse allouée mais **non associée** est facturée. Une seconde adresse avait été allouée par erreur : elle a été libérée (**Actions** → **Libérer les adresses IP Elastic**). Il ne doit en rester qu'une.
 
-### 3.3 Ouvrir les ports
+### 3.4 Groupe de sécurité (pare-feu)
 
-VM → *Réseau* → *Paramètres réseau* → *Créer une règle de port* → *Règle de port d'entrée* :
+EC2 → **Groupes de sécurité** → `launch-wizard-1` → **Modifier les règles entrantes** :
 
-| Priorité | Nom | Port | Source | Pourquoi |
-|---|---|---|---|---|
-| 300 | SSH | 22 | **Mon adresse IP** (de préférence) | Administration |
-| 310 | HTTP | 80 | Tous | Défi Let's Encrypt, redirection vers HTTPS |
-| 320 | HTTPS | 443 | Tous | PWA et API |
-| 330 | MQTTS | 8883 | Tous | Raspberry Pi |
+| Type | Port | Source | État |
+|---|---|---|---|
+| SSH | 22 | 0.0.0.0/0 (mieux : « Mon IP ») | ouvert |
+| HTTP | 80 | 0.0.0.0/0 | ouvert |
+| HTTPS | 443 | 0.0.0.0/0 | ouvert (ajouté après coup, voir 5.2) |
+| TCP personnalisé | 8883 | 0.0.0.0/0 | **à ouvrir au sprint 2** (MQTT) |
 
-Ne **pas** ouvrir 27017 (MongoDB) ni 8080 (WildFly). En CLI :
+Ne **jamais** ouvrir 27017 (MongoDB) ni 8080 (WildFly).
 
-```bash
-az vm open-port -g rg-smartparking -n vm-smartparking --port 80,443,8883 --priority 310
-```
+> Docker contourne le pare-feu `ufw` d'Ubuntu. C'est donc le **groupe de sécurité AWS** qui protège la VM, et MongoDB n'écoute que sur `127.0.0.1`.
 
-> Docker contourne le pare-feu `ufw` d'Ubuntu : c'est le **groupe de sécurité réseau Azure** (ou le *security group* AWS) qui protège la VM. C'est aussi pour cela que MongoDB n'écoute que sur `127.0.0.1`.
+### 3.5 Première connexion SSH et mise à jour
 
-### 3.4 Première connexion et préparation du système
-
-Sur le PC (PowerShell), protéger la clé (sinon `ssh` la refuse), puis se connecter :
+Dans PowerShell, sur le PC : protéger la clé (sinon `ssh` la refuse), puis se connecter.
 
 ```powershell
-icacls $HOME\.ssh\vm-smartparking_key.pem /inheritance:r /grant:r "$($env:USERNAME):R"
-ssh -i $HOME\.ssh\vm-smartparking_key.pem azureuser@smartparking-supcom.francecentral.cloudapp.azure.com
+icacls "<CHEMIN_CLE>\smart-parking-key.pem" /inheritance:r /grant:r "$($env:USERNAME):R"
+ssh -i "<CHEMIN_CLE>\smart-parking-key.pem" ubuntu@13.49.171.243
 ```
 
-Résultat attendu : `Are you sure you want to continue connecting?` → `yes`, puis l'invite `azureuser@vm-smartparking:~$`.
+Résultat attendu : la question `Are you sure you want to continue connecting?` (répondre `yes`), puis l'invite `ubuntu@ip-…:~$`. L'utilisateur `ubuntu` n'est pas root : il passe par `sudo`.
 
-Sur la VM. L'utilisateur `azureuser` n'est pas root : il utilise `sudo`.
+Sur la VM :
 
 ```bash
-# Mise à jour du système, puis redémarrage si demandé
-sudo apt update && sudo apt -y full-upgrade
-sudo reboot            # se reconnecter après 1 minute
-
-# Mises à jour de sécurité automatiques (déjà actives sur Ubuntu, on vérifie)
-systemctl is-enabled unattended-upgrades      # → enabled
-
-# 2 Go de swap : évite que WildFly + MongoDB manquent de mémoire sur 2 Go de RAM
-sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
-sudo mkswap /swapfile && sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-free -h                                        # → ligne "Swap:" à 2.0Gi
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y nginx
 ```
 
-### 3.5 Installer Docker
+Vérification : `http://13.49.171.243` affiche « Welcome to nginx! ».
 
-Commandes officielles de Docker pour Ubuntu :
+### 3.6 Nom de domaine DuckDNS
 
-```bash
-sudo apt-get install -y ca-certificates curl git
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker $USER
-exit                   # se reconnecter pour que le groupe docker soit pris en compte
-```
+Sur https://www.duckdns.org : créer le sous-domaine **`smartparking-supcom`**, saisir l'adresse **13.49.171.243** dans *current ip*, puis cliquer sur *update ip*.
 
-Vérification après reconnexion :
+> Le **jeton DuckDNS** affiché sur la page est un secret : il permet de changer l'adresse du domaine. Ne jamais le mettre dans le dépôt.
 
-```bash
-docker run --rm hello-world     # → "Hello from Docker!"
-docker compose version          # → Docker Compose version v2.x ou plus
-```
-
-### 3.6 Récupérer le projet et lancer les services
-
-```bash
-sudo mkdir -p /opt/smartparking && sudo chown $USER: /opt/smartparking
-git clone https://github.com/amaltrigui19/projet_smart_parking.git /opt/smartparking
-cd /opt/smartparking/infra
-
-cp .env.example .env && chmod 600 .env
-for i in 1 2 3; do openssl rand -hex 16; done   # 3 mots de passe
-nano .env    # DOMAINE=<votre nom DNS> et les 3 mots de passe ; Ctrl+O, Entrée, Ctrl+X
-```
-
-Nginx a besoin d'un certificat pour démarrer : on crée d'abord un certificat **temporaire** avec la CA locale, puis on lance les services.
-
-```bash
-./scripts/generer-certificats.sh
-docker compose up -d --build
-docker compose ps        # 4 services "Up", mongo "(healthy)"
-```
-
-Vérification (certificat temporaire, d'où `-k`) :
-
-```bash
-curl -kI https://$DOMAINE/          # → HTTP/1.1 200 OK
-curl -I  http://$DOMAINE/           # → HTTP/1.1 301 Moved Permanently, Location: https://...
-```
-
-### 3.7 Certificat Let's Encrypt avec Certbot
-
-```bash
-sudo apt install -y certbot
-sudo certbot certonly --webroot -w /opt/smartparking/infra/certbot-www \
-  -d $DOMAINE --email <adresse-email-equipe> --agree-tos --no-eff-email
-```
-
-Résultat attendu : `Successfully received certificate.` et le chemin `/etc/letsencrypt/live/<domaine>/fullchain.pem`.
-
-> Pour s'entraîner sans risquer la limite de Let's Encrypt (5 échecs par heure), ajouter `--staging`, puis relancer sans cette option une fois que tout marche.
-
-Installer le script qui copie le certificat pour Nginx et Mosquitto, et le lancer une première fois :
-
-```bash
-sudo cp /opt/smartparking/infra/scripts/certbot-deploy-hook.sh /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
-sudo chmod 755 /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
-sudo RENEWED_LINEAGE=/etc/letsencrypt/live/$DOMAINE /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
-```
-
-Résultat attendu : `Certificat Let's Encrypt installé pour Nginx et Mosquitto.`
-
-**Renouvellement automatique** : le paquet `certbot` installe un minuteur systemd qui tente le renouvellement deux fois par jour. Le certificat (valable 90 jours) est renouvelé 30 jours avant son expiration, puis le script ci-dessus recharge Nginx et Mosquitto.
-
-```bash
-systemctl list-timers | grep certbot    # → une ligne certbot.timer
-sudo certbot renew --dry-run            # → "Congratulations, all simulated renewals succeeded"
-```
-
-### 3.8 Vérification de la VM
-
-Depuis la VM :
-
-```bash
-sudo apt install -y mosquitto-clients
-cd /opt/smartparking && ./infra/scripts/verifier.sh $DOMAINE    # → "Tout fonctionne."
-```
-
-Depuis le PC (PowerShell : taper **`curl.exe`**, car `curl` seul lance `Invoke-WebRequest`) :
+Vérification (PowerShell) :
 
 ```powershell
-curl.exe -I https://smartparking-supcom.francecentral.cloudapp.azure.com/
-curl.exe https://smartparking-supcom.francecentral.cloudapp.azure.com/api/sante
+Resolve-DnsName smartparking-supcom.duckdns.org
 ```
 
-Résultat attendu : `HTTP/1.1 200 OK` **sans** option `-k` (le certificat est reconnu), puis le JSON `{"statut":"ok",...}`.
+Résultat attendu : une ligne `A` avec `13.49.171.243`.
 
-Certificat vu par un client :
+### 3.7 Nom du serveur dans Nginx
+
+Sur la VM, remplacer `server_name _;` par le domaine dans le site par défaut, tester la configuration, puis recharger :
 
 ```bash
-openssl s_client -connect $DOMAINE:443 -servername $DOMAINE </dev/null 2>/dev/null | openssl x509 -noout -issuer -enddate
-# → issuer=C = US, O = Let's Encrypt, CN = ...   notAfter=<dans 90 jours>
+sudo sed -i 's/server_name _;/server_name smartparking-supcom.duckdns.org;/' /etc/nginx/sites-available/default
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Test MQTT TLS depuis le Raspberry Pi ou depuis un PC qui a les clients Mosquitto : comme en 2.3, mais avec `-h $DOMAINE` et `--capath /etc/ssl/certs` au lieu de `--cafile …ca.pem`, car Let's Encrypt est reconnu par le système.
+Résultat attendu : `syntax is ok` et `test is successful`. Certbot a besoin de ce `server_name` pour trouver le bon bloc à modifier.
 
-**Navigateur** : `https://<domaine>` affiche la PWA avec un cadenas valide : **c'est la démo du sprint 1**.
+### 3.8 Certificat Let's Encrypt (Certbot, plugin nginx)
 
-### 3.9 Différences pour AWS
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d smartparking-supcom.duckdns.org
+```
 
-| Étape | AWS EC2 |
+Certbot demande une adresse email (avertissements d'expiration) et l'acceptation des conditions. Ensuite :
+- il obtient le certificat ;
+- il ajoute lui-même dans `/etc/nginx/sites-available/default` le bloc `listen 443 ssl` et la redirection de HTTP vers HTTPS (lignes marquées `# managed by Certbot`).
+
+Résultat attendu : `Successfully received certificate` puis `Successfully deployed certificate`.
+
+Fichiers créés :
+
+```
+/etc/letsencrypt/live/smartparking-supcom.duckdns.org/fullchain.pem   # certificat + chaîne
+/etc/letsencrypt/live/smartparking-supcom.duckdns.org/privkey.pem     # clé privée (reste sur la VM)
+```
+
+Le **renouvellement automatique** est assuré par le minuteur `certbot.timer`, installé par le paquet : il passe deux fois par jour et renouvelle le certificat 30 jours avant son expiration.
+
+### 3.9 Vérifications (sorties réelles du 6 novembre 2026)
+
+**Origine des sorties.** Sauf mention contraire, toutes les sorties ci-dessous ont été obtenues par Maissa, avec l'aide de Claude Code, le 6 novembre 2026 entre 23:20 et 23:30 UTC : `curl` et `openssl` depuis le PC, puis une connexion SSH avec des **commandes de lecture uniquement**. Elles sont recopiées sans modification, sauf `certbot certificates`, filtrée sur 5 lignes. Les étapes 3.2 à 3.8 (création de la VM, Elastic IP, DuckDNS, Nginx, Certbot) et le problème du port 443 viennent du compte rendu de Maissa ; ces commandes n'ont pas été rejouées.
+
+**Depuis le PC** (Git Bash ; dans PowerShell, taper `curl.exe` au lieu de `curl`) :
+
+```
+$ curl -I https://smartparking-supcom.duckdns.org
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Fri, 06 Nov 2026 23:29:42 GMT
+Content-Type: text/html
+Content-Length: 615
+Last-Modified: Fri, 06 Nov 2026 22:03:01 GMT
+Connection: keep-alive
+ETag: "6aee4e95-267"
+Accept-Ranges: bytes
+```
+
+```
+$ curl -I http://smartparking-supcom.duckdns.org
+HTTP/1.1 301 Moved Permanently
+Server: nginx/1.24.0 (Ubuntu)
+Date: Fri, 06 Nov 2026 23:29:42 GMT
+Content-Type: text/html
+Content-Length: 178
+Connection: keep-alive
+Location: https://smartparking-supcom.duckdns.org/
+```
+
+Certificat présenté par le serveur :
+
+```
+$ openssl s_client -connect smartparking-supcom.duckdns.org:443 -servername smartparking-supcom.duckdns.org </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates
+subject=CN=smartparking-supcom.duckdns.org
+issuer=C=US, O=Let's Encrypt, CN=YE2
+notBefore=Nov  6 21:12:14 2026 GMT
+notAfter=Feb  4 21:12:13 2027 GMT
+```
+
+**Sur la VM** (en SSH, commandes de lecture seulement) :
+
+```
+$ sudo certbot renew --dry-run --no-random-sleep-on-renew
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Processing /etc/letsencrypt/renewal/smartparking-supcom.duckdns.org.conf
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Simulating renewal of an existing certificate for smartparking-supcom.duckdns.org
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Congratulations, all simulated renewals succeeded:
+  /etc/letsencrypt/live/smartparking-supcom.duckdns.org/fullchain.pem (success)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+```
+
+> `--no-random-sleep-on-renew` : lancée **sans terminal** (par exemple `ssh … "sudo certbot renew --dry-run"`), la commande attend d'abord un délai aléatoire de quelques minutes. On le voit dans `/var/log/letsencrypt/letsencrypt.log` : `Non-interactive renewal: random delay of 275 seconds`. Ce n'est pas un blocage ; l'option supprime ce délai. Dans une session SSH interactive, il n'y a pas de délai. Le même journal montre aussi un premier `--dry-run` réussi à 22:12 UTC, lancé par Maissa juste après l'installation.
+
+```
+$ systemctl list-timers | grep certbot
+Sat 2026-11-07 04:01:36 UTC      4h 31min -                                      - certbot.timer                  certbot.service
+```
+
+```
+$ sudo certbot certificates
+  Certificate Name: smartparking-supcom.duckdns.org
+    Domains: smartparking-supcom.duckdns.org
+    Expiry Date: 2027-02-04 21:12:13+00:00 (VALID: 89 days)
+    Certificate Path: /etc/letsencrypt/live/smartparking-supcom.duckdns.org/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/smartparking-supcom.duckdns.org/privkey.pem
+```
+
+(Sortie filtrée avec `grep` sur ces cinq lignes.)
+
+```
+$ sudo nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
+```
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           1.9Gi       411Mi       829Mi       2.8Mi       845Mi       1.5Gi
+Swap:             0B          0B          0B
+```
+
+```
+$ df -h
+Filesystem       Size  Used Avail Use% Mounted on
+/dev/root         19G  2.3G   17G  13% /
+tmpfs            953M     0  953M   0% /dev/shm
+tmpfs            382M  900K  381M   1% /run
+tmpfs            5.0M     0  5.0M   0% /run/lock
+efivarfs         128K  3.1K  120K   3% /sys/firmware/efi/efivars
+/dev/nvme0n1p16  881M  114M  706M  14% /boot
+/dev/nvme0n1p15  105M  6.2M   99M   6% /boot/efi
+tmpfs            191M   12K  191M   1% /run/user/1000
+```
+
+Autres constats :
+- Ubuntu 24.04.5 LTS, 2 vCPU.
+- Seuls les ports 22, 80 et 443 sont en écoute (`sudo ss -tlnp`).
+- Docker n'est pas installé.
+- Le renouvellement passe par le plugin nginx : `/etc/letsencrypt/renewal/smartparking-supcom.duckdns.org.conf` contient `authenticator = nginx` et `installer = nginx`.
+- Aucun script de renouvellement (`renewal-hooks`) n'est installé.
+
+| Vérification | Résultat |
 |---|---|
-| VM | *Launch instance*, Ubuntu Server 24.04 LTS, **t3.small** (2 Go), disque gp3 de 20 Go, paire de clés `.pem`. Utilisateur `ubuntu` au lieu d'`azureuser` |
-| IP fixe | *Elastic IP* → *Allocate* → *Associate* à l'instance |
-| Ports | *Security group* : règles entrantes 22 (My IP), 80, 443, 8883 |
-| Nom DNS | Let's Encrypt **refuse** les noms `*.amazonaws.com`. Prendre un sous-domaine gratuit, par exemple sur DuckDNS (`smartparking-supcom.duckdns.org` → l'Elastic IP) |
-| Suite | identique à partir de 3.4 |
+| HTTPS répond (`200`) | ✅ |
+| HTTP redirige vers HTTPS (`301`) | ✅ |
+| Certificat Let's Encrypt valide jusqu'au 4 février 2027 | ✅ |
+| Renouvellement simulé (`--dry-run`) | ✅ |
+| `certbot.timer` programmé | ✅ |
+| Configuration Nginx valide | ✅ |
+| Mémoire : 1,5 Gio disponible, **pas de swap** | ⚠️ suffisant aujourd'hui ; à corriger avant la stack Docker (4.2) |
+| Disque : 17 Gio libres sur 19 | ✅ |
+| Port 8883 joignable | ⏳ fermé, prévu au sprint 2 |
 
 ### 3.10 Coût et arrêt de la VM
 
-Ordres de grandeur (à vérifier sur la calculatrice de prix Azure ou AWS, ils varient selon la région) :
+Ordres de grandeur à eu-north-1 (à vérifier dans AWS *Billing and Cost Management*) :
 
-| Élément | Quand c'est facturé | Prix approximatif |
+| Élément | Facturé | Prix approximatif |
 |---|---|---|
-| VM B1ms (Azure) ou t3.small (AWS) | seulement quand elle **tourne** | ~0,02 USD/h, ~15 USD/mois en continu |
-| Disque 30 Go | toujours, même VM arrêtée | ~2 à 3 USD/mois |
-| IP publique statique | toujours | ~3,5 USD/mois |
+| t3.small | seulement quand l'instance **tourne** | ~0,022 USD/h, soit ~16 USD/mois en continu |
+| Disque gp3 20 Gio | toujours, même instance arrêtée | ~2 USD/mois |
+| Adresse IPv4 publique (Elastic IP) | toujours, même instance arrêtée | ~3,6 USD/mois |
+| **Total** | VM allumée en continu | **~20 USD/mois**, pris sur les crédits |
 
-Avec 100 USD de crédit, une VM allumée en permanence tient environ 5 mois. En l'arrêtant hors des séances de travail, le crédit dure toute l'année.
+Allumée en permanence, la VM coûterait environ 120 USD d'ici au 6 mai 2027, **plus que les 100 USD de crédits**. Il faut donc l'**arrêter quand elle ne sert pas pendant plusieurs jours**. Arrêtée, elle ne coûte plus qu'environ 5,6 USD/mois (disque et IP).
 
-**Arrêter pour de bon (ne plus payer le calcul)** :
-- Azure : portail → VM → **Arrêter**. L'état doit devenir **« Arrêté (désalloué) »**. Un `sudo shutdown` depuis la VM donne seulement « Arrêté » : **la VM reste facturée**. En CLI : `az vm deallocate -g rg-smartparking -n vm-smartparking`, puis `az vm start …` pour la relancer.
-- AWS : *Instance state* → **Stop instance**.
+**Arrêter** : EC2 → *Instances* → `smart-parking-vm` → **État de l'instance** → **Arrêter l'instance**. Ne **pas** choisir *Résilier* : cela supprime la VM et son disque.
 
-**Arrêt automatique chaque soir** (Azure) : VM → *Opérations* → *Arrêt automatique* → activé, 23:00, fuseau (UTC+01:00). En CLI : `az vm auto-shutdown -g rg-smartparking -n vm-smartparking --time 2200` (heure UTC).
+**Redémarrer** : **État de l'instance** → **Démarrer l'instance**. L'Elastic IP et le nom DuckDNS ne changent pas, et Nginx redémarre seul. Compter 1 à 2 minutes avant que `https://` réponde.
 
-**Au redémarrage**, rien à refaire : l'IP statique et le nom DNS sont conservés, et les conteneurs repartent seuls (`restart: unless-stopped`). Compter 1 à 2 minutes avant que `https://` réponde.
+**Surveiller les crédits** :
+- *Billing and Cost Management* → *Credits* : le solde restant ;
+- *Budgets* → *Create budget* → modèle *Monthly cost budget*, avec une alerte par email à 50 % et 80 %.
 
-**Fin du projet** : supprimer le groupe de ressources `rg-smartparking` (VM, disque, IP), sinon disque et IP restent facturés.
+> En plan gratuit, vérifier dans *Billing* ce qui se passe quand les crédits sont épuisés ou expirés. La clôture du compte peut entraîner la suppression des ressources.
 
-**Budget** : Azure → *Gestion des coûts* → *Budgets* → alerte à 50 % et 80 % du crédit.
+**Fin du projet** : résilier l'instance, puis **libérer l'Elastic IP** et supprimer les instantanés éventuels.
 
 ---
 
-## 4. Dépannage
+## 4. Passage à la stack Docker sur la VM (sprint 2)
+
+> **À ne pas appliquer maintenant.** C'est une tâche du sprint 2 (profil A). Cette section décrit l'option retenue et ses étapes.
+
+### 4.1 Le problème, et l'option retenue
+
+Le Nginx de l'hôte occupe déjà les ports 80 et 443, et le conteneur `nginx` de `infra/` les demande aussi : les deux ne peuvent pas tourner en même temps.
+
+**Option retenue : arrêter le Nginx de l'hôte et laisser le conteneur `nginx` servir les ports 80 et 443, avec le certificat de `/etc/letsencrypt/` copié dans `infra/certs/` par `certbot-deploy-hook.sh`.**
+
+Pourquoi :
+- La VM utilise exactement la configuration déjà testée en local (`infra/nginx/nginx.conf`) : une seule configuration Nginx à maintenir.
+- Le même certificat sert aussi à Mosquitto sur le port 8883.
+- Garder le Nginx de l'hôte en reverse proxy devant le conteneur ajouterait une deuxième configuration, obligerait le conteneur à écouter sur d'autres ports et ferait diverger la VM de l'environnement local.
+
+Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **plugin nginx** de Certbot, qui a besoin du Nginx de l'hôte. Il faut le basculer en mode **webroot**. Le conteneur `nginx` sert déjà le dossier du défi (`/.well-known/acme-challenge/` → `infra/certbot-www/`).
+
+### 4.2 Étapes prévues
+
+1. **Swap de 2 Gio** : la VM n'en a pas, et WildFly avec MongoDB peut dépasser 2 Gio.
+   ```bash
+   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+   sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   free -h        # → Swap: 2.0Gi
+   ```
+2. **Installer Docker** (dépôt officiel), puis se reconnecter :
+   ```bash
+   sudo apt-get install -y ca-certificates curl git
+   sudo install -m 0755 -d /etc/apt/keyrings
+   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+   sudo chmod a+r /etc/apt/keyrings/docker.asc
+   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+     | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+   sudo apt-get update
+   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+   sudo usermod -aG docker $USER && exit
+   ```
+   Vérification après reconnexion : `docker run --rm hello-world` → `Hello from Docker!`
+3. **Récupérer le projet et créer `.env`** :
+   ```bash
+   sudo mkdir -p /opt/smartparking && sudo chown $USER: /opt/smartparking
+   git clone https://github.com/amaltrigui19/projet_smart_parking.git /opt/smartparking
+   cd /opt/smartparking/infra
+   cp .env.example .env && chmod 600 .env
+   nano .env      # DOMAINE=smartparking-supcom.duckdns.org + 3 mots de passe (openssl rand -hex 16)
+   ```
+4. **Installer le script de copie du certificat et le lancer une fois.** Il copie `/etc/letsencrypt/live/smartparking-supcom.duckdns.org/{fullchain,privkey}.pem` dans `infra/certs/`. Comme les conteneurs ne tournent pas encore, il ne recharge rien.
+   ```bash
+   sudo cp scripts/certbot-deploy-hook.sh /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
+   sudo chmod 755 /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
+   sudo RENEWED_LINEAGE=/etc/letsencrypt/live/smartparking-supcom.duckdns.org \
+        /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
+   ls -l certs/   # → fullchain.pem (644) et privkey.pem (640, groupe 1883)
+   ```
+5. **Basculer du Nginx de l'hôte au conteneur.** Le site est coupé environ une minute.
+   ```bash
+   sudo systemctl disable --now nginx
+   docker compose up -d --build
+   docker compose ps                     # 4 services "Up"
+   ```
+6. **Basculer le renouvellement en mode webroot**, puis vérifier :
+   ```bash
+   sudo certbot reconfigure --cert-name smartparking-supcom.duckdns.org \
+        --webroot -w /opt/smartparking/infra/certbot-www
+   sudo grep -E 'authenticator|installer' /etc/letsencrypt/renewal/smartparking-supcom.duckdns.org.conf
+   # attendu : authenticator = webroot (et plus d'installer = nginx)
+   sudo certbot renew --dry-run --no-random-sleep-on-renew
+   # attendu : Congratulations, all simulated renewals succeeded
+   ```
+   Si la ligne `installer = nginx` est restée, la retirer du fichier `.conf`, puis relancer le `--dry-run`.
+7. **Ouvrir le port 8883** dans le groupe de sécurité `launch-wizard-1` (règle TCP 8883, source 0.0.0.0/0).
+8. **Tout vérifier** :
+   ```bash
+   sudo apt install -y mosquitto-clients
+   cd /opt/smartparking && ./infra/scripts/verifier.sh smartparking-supcom.duckdns.org   # → "Tout fonctionne."
+   ```
+   Depuis le PC : `curl -I https://smartparking-supcom.duckdns.org` → `200`, et https://smartparking-supcom.duckdns.org/api/sante → `{"statut":"ok",...}`.
+
+**Retour en arrière** si quelque chose ne marche pas : `docker compose down`, puis `sudo systemctl enable --now nginx`. Le Nginx de l'hôte n'a pas été modifié.
+
+### 4.3 MQTT (port 8883) avec le certificat Let's Encrypt
+
+- Mosquitto lit `infra/certs/fullchain.pem` et `privkey.pem`. Ce sont les mêmes fichiers que Nginx : il n'y a **pas de second certificat** à demander.
+- La clé est lisible par le groupe 1883, l'utilisateur `mosquitto` du conteneur : `certbot-deploy-hook.sh` s'en charge.
+- À chaque renouvellement, le script recopie les fichiers, recharge Nginx et redémarre Mosquitto.
+- **Côté Raspberry Pi** : Let's Encrypt est reconnu par le système. On se connecte donc avec `--capath /etc/ssl/certs`, ou `tls_set()` sans argument en Python, sur `smartparking-supcom.duckdns.org:8883`. Aucun fichier de certificat n'est à copier sur le Pi.
+
+---
+
+## 5. Dépannage
+
+### 5.1 Environnement local (voie B)
 
 | Symptôme | Cause | Solution |
 |---|---|---|
 | `failed to connect to the docker API … dockerDesktopLinuxEngine` | Docker Desktop n'est pas lancé | Lancer Docker Desktop, attendre que la baleine ne bouge plus |
+| Le navigateur affiche « Votre connexion n'est pas privée » sur https://localhost | La CA locale n'est pas reconnue par Windows | `certutil -user -addstore Root infra\certs\ca.pem`, puis fermer et rouvrir le navigateur (étape 3 de 2.2) |
 | `curl: (60) schannel: … CERT_TRUST_REVOCATION_STATUS_UNKNOWN` (Windows) | Le curl de Windows cherche une liste de révocation que la CA locale n'a pas | Ajouter `--ssl-no-revoke` (fait par `verifier.sh`) |
 | En PowerShell, `curl -I` donne une erreur de paramètre | `curl` = `Invoke-WebRequest` dans PowerShell 5 | Taper `curl.exe` |
-| `Error: Problem setting TLS options: File not found` avec `docker compose exec` dans Git Bash | Git Bash transforme `/mosquitto/...` en chemin Windows | Préfixer la commande par `MSYS_NO_PATHCONV=1` |
-| `Bind for 0.0.0.0:443 failed: port is already allocated` | Un autre programme utilise 80, 443 ou 8883 | `netstat -ano \| findstr ":443 "` puis arrêter le programme (IIS, autre serveur local) |
+| `Error: Problem setting TLS options: File not found` avec `docker compose exec` dans Git Bash | Git Bash transforme `/mosquitto/...` en chemin Windows | Préfixer par `MSYS_NO_PATHCONV=1` |
+| `Bind for 0.0.0.0:443 failed: port is already allocated` | Un autre programme utilise 80, 443 ou 8883 | `netstat -ano \| findstr ":443 "` puis arrêter ce programme |
 | Nginx s'arrête : `cannot load certificate "/etc/nginx/certs/fullchain.pem"` | Certificats absents | `./infra/scripts/generer-certificats.sh` puis `docker compose restart nginx` |
 | `502 Bad Gateway` sur `/api/...` | WildFly démarre encore (10 à 30 s) ou a planté | Attendre, puis `docker compose logs wildfly` |
-| `/api/sante` répond `503` avec `"mongo":"ko"` ou `"mqtt":"ko"` | Le service indiqué ne tourne pas | `docker compose ps`, puis `docker compose logs mongo` ou `mqtt` |
+| `/api/sante` répond `503` avec `"mongo":"ko"` ou `"mqtt":"ko"` | Le service indiqué ne tourne pas | `docker compose ps`, puis `docker compose logs mongo` (ou `mqtt`) |
 | `Connection Refused: not authorised` (MQTT) | Mauvais mot de passe, ou `.env` modifié sans recréer le conteneur | Vérifier `.env`, puis `docker compose up -d --force-recreate mqtt` |
 | Un message MQTT publié n'arrive jamais | L'ACL interdit ce topic à ce compte (refus silencieux) | Vérifier `infra/mosquitto/acl` et le contrat 5.3 |
-| Dans les journaux de `mqtt` : `unexpected eof while reading` venant de l'adresse de WildFly | Normal : `/api/sante` teste seulement que le port 8883 répond, sans faire la négociation TLS | Rien à faire |
-| MongoDB refuse le nouveau mot de passe mis dans `.env` | Le compte admin n'est créé qu'au **premier** démarrage, avec un volume vide | Changer le mot de passe dans `mongosh`, ou (en perdant les données) `docker compose down -v` |
-| `$'\r': command not found` ou `sh: …demarrer.sh: not found` | Script enregistré avec des fins de ligne Windows (CRLF) | `.gitattributes` force LF ; sinon `sed -i 's/\r$//' <fichier>` |
-| Certbot : `Timeout during connect` ou `unauthorized` | Port 80 fermé dans le groupe de sécurité, DNS faux, ou Nginx arrêté | Vérifier 3.3, `Resolve-DnsName`, `docker compose ps` |
-| Certbot : `too many failed authorizations` | Limite de Let's Encrypt atteinte | Attendre 1 heure, s'entraîner avec `--staging` |
-| `verifier.sh <domaine>` sur la VM : MQTT `Timed out` | La VM n'arrive pas à se joindre par son IP publique | Ajouter `127.0.0.1 <domaine>` dans `/etc/hosts` de la VM |
-| La VM rame, WildFly redémarre seul | Mémoire pleine | `docker stats`, `free -h` ; vérifier le swap (3.4) ou passer à B2s |
-| SSH : `UNPROTECTED PRIVATE KEY FILE` | Droits trop larges sur la clé `.pem` | Commande `icacls` de 3.4 |
+| Journaux de `mqtt` : `unexpected eof while reading` venant de WildFly | Normal : `/api/sante` vérifie seulement que le port 8883 répond, sans faire la négociation TLS | Rien à faire |
+| MongoDB refuse le nouveau mot de passe mis dans `.env` | Le compte admin n'est créé qu'au **premier** démarrage, sur un volume vide | Changer le mot de passe dans `mongosh`, ou `docker compose down -v` (efface les données) |
+| `$'\r': command not found` | Script enregistré avec des fins de ligne Windows (CRLF) | `.gitattributes` force LF ; sinon `sed -i 's/\r$//' <fichier>` |
+
+### 5.2 VM AWS (voie A)
+
+| Symptôme | Cause | Solution |
+|---|---|---|
+| `https://` donne `ERR_CONNECTION_TIMED_OUT` alors que `http://` marche | **Port 443 absent du groupe de sécurité** : Nginx écoute bien, mais AWS bloque le trafic. C'est le problème rencontré le 6 novembre | Groupe de sécurité → règle entrante **HTTPS 443**, source 0.0.0.0/0 |
+| MQTT : `Connection timed out` sur le port 8883 | Port 8883 pas encore ouvert (normal jusqu'au sprint 2) | Ajouter la règle TCP 8883 (étape 7 de 4.2) |
+| `ssh` : `UNPROTECTED PRIVATE KEY FILE` ou `Permission denied (publickey)` | Droits trop larges sur la clé, ou mauvais utilisateur | Commande `icacls` de 3.5 ; l'utilisateur est `ubuntu` |
+| `ssh` : `Connection timed out` | Instance arrêtée, ou port 22 restreint à une ancienne IP | Démarrer l'instance ; vérifier la règle SSH |
+| Le domaine ne pointe pas vers la VM | Adresse DuckDNS fausse, ou Elastic IP dissociée | `Resolve-DnsName smartparking-supcom.duckdns.org` → doit donner `13.49.171.243` ; corriger sur duckdns.org |
+| Certbot : `Timeout during connect` ou `unauthorized` | Port 80 fermé, domaine faux, ou serveur web arrêté | Vérifier 3.4, le DNS (3.6) et `sudo systemctl status nginx` |
+| Certbot : `too many failed authorizations` | Limite de Let's Encrypt (5 échecs par heure) | Attendre 1 heure ; s'entraîner avec `--staging` |
+| `sudo certbot renew --dry-run` semble bloqué quand il est lancé à distance | Délai aléatoire normal sans terminal (voir 3.9) | Attendre, ou ajouter `--no-random-sleep-on-renew` |
+| Commande envoyée par `ssh` depuis **PowerShell 5** cassée (`command not found` sur un morceau de motif `grep`) | PowerShell retire les guillemets doubles des arguments passés à `ssh` | Se connecter d'abord (`ssh …`), puis taper la commande sur la VM ; ou utiliser Git Bash |
+| Après le passage à Docker (4.2), le renouvellement échoue | Certbot utilise encore le plugin nginx de l'hôte | Étape 6 de 4.2 (`certbot reconfigure … --webroot`) |
+| Après le passage à Docker, `Bind for 0.0.0.0:80 failed` | Le Nginx de l'hôte tourne encore | `sudo systemctl disable --now nginx` |
+| La VM rame, WildFly redémarre seul | Mémoire pleine (2 Gio, sans swap) | Créer le swap (étape 1 de 4.2) ; `docker stats` |
+
+---
+
+## Annexe : alternative Azure
+
+Si l'équipe passe un jour sur Azure, les étapes sont les mêmes, avec ces différences :
+- VM **Standard_B1ms** (2 Go) avec Ubuntu 24.04 et IP publique statique.
+- Nom DNS gratuit : *IP publique* → *Configuration* → *Étiquette du nom DNS* (`<nom>.<region>.cloudapp.azure.com`). Let's Encrypt l'accepte, DuckDNS n'est donc pas nécessaire.
+- Utilisateur `azureuser`.
+- Ports à ouvrir dans le *groupe de sécurité réseau*.
+- Pour arrêter la VM, choisir **Arrêter** dans le portail, jusqu'à l'état « Arrêté (désalloué) ». Un `shutdown` lancé depuis la VM ne suffit pas : elle reste facturée.
