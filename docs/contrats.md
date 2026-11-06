@@ -135,6 +135,7 @@ Cette section répond aux besoins listés en 1.3 à 1.5. Les noms des routes son
 
 ### 2.1 Conventions
 
+- **URL de base** : `https://smartparking-supcom.duckdns.org/api` (VM AWS ; l'API y sera déployée au sprint 2) et `https://localhost/api` en local (`infra/`, voir `docs/installation-serveur.md`).
 - Préfixe **`/api`**, JSON en UTF-8, dates ISO 8601 UTC avec `Z` (voir 1.1).
 - Noms des champs en `snake_case`, sans accents (`duree_max_min`, `mot_de_passe`).
 - Un seul parking dans le projet : `P1`. Les routes ne le répètent pas ; il figure dans les réponses quand c'est utile.

@@ -99,6 +99,8 @@ Le format du fichier des places (polygones) est illustré par `iot/places.exempl
 
 ### Serveur et PWA
 
+**Serveur en ligne : https://smartparking-supcom.duckdns.org** (VM AWS eu-north-1, HTTPS Let's Encrypt). Aujourd'hui, il sert la page d'accueil de Nginx ; la PWA et l'API (`/api`) y seront déployées au sprint 2.
+
 Tout le serveur (Nginx en HTTPS, Mosquitto en TLS, MongoDB, WildFly) se lance avec Docker, en local comme sur la VM cloud :
 
 ```bash
@@ -108,7 +110,7 @@ cd infra && docker compose up -d --build
 cd .. && ./infra/scripts/verifier.sh      # → "Tout fonctionne."
 ```
 
-Procédure complète (voie locale et VM cloud avec Let's Encrypt) : [`docs/installation-serveur.md`](docs/installation-serveur.md).
+Procédure complète (voie locale, VM AWS réellement installée, passage à Docker au sprint 2) : [`docs/installation-serveur.md`](docs/installation-serveur.md).
 
 ## Planning (10 sprints)
 
