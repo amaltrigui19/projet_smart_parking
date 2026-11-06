@@ -46,6 +46,35 @@ pip install -r requirements.txt
    ```
 3. Regarder les images annotées dans `resultats/test_pretrained/`.
 
+## Étape 1 — Caméra du Raspberry Pi (sprint 1)
+
+Installation du Pi et de la caméra : voir [`../docs/installation-pi.md`](../docs/installation-pi.md).
+
+Prendre une photo (depuis la racine du dépôt) :
+
+```bash
+python iot/capture.py                                # une photo dans iot/photos_test/
+python iot/capture.py --largeur 1920 --hauteur 1080  # autre résolution
+python iot/capture.py --nom maquette.jpg             # nom de fichier choisi
+python iot/capture.py --nombre 10 --intervalle 3     # 10 photos, une toutes les 3 s
+python iot/capture.py --source opencv --camera 0     # forcer une webcam USB
+```
+
+Le script choisit tout seul le module caméra (picamera2) s'il en trouve un, sinon une webcam (OpenCV),
+et affiche une **mesure de netteté** pour chaque photo (variance du laplacien : plus elle est élevée,
+plus l'image est nette ; la valeur dépend de la scène, elle sert à comparer deux réglages).
+
+Les photos vont dans `iot/photos_test/`, dossier ignoré par Git. Elles servent à régler la caméra et à
+constituer le dataset de la maquette. Dans le fonctionnement normal du système, **les images ne sont
+jamais enregistrées** (privacy by design).
+
+Tests (sans caméra) :
+
+```bash
+cd iot
+python -m unittest test_capture -v
+```
+
 ## Contrat MQTT (à valider avec la partie serveur)
 
 | Topic | Exemple de message | Envoyé quand |
@@ -73,6 +102,8 @@ iot/
 ├── requirements.txt
 ├── places.exemple.json
 ├── test_yolo.py          # S1 : test du modèle pré-entraîné
+├── capture.py            # S1 : prise de photo (module caméra ou webcam)
+├── test_capture.py       # S1 : tests de capture.py
 ├── detecteur.py          # caméra + YOLO              (à venir)
 ├── occupation.py         # polygones, lissage, anomalies (à venir)
 ├── mqtt_client.py        # envoi + file locale       (à venir)
