@@ -1,0 +1,81 @@
+# Smart Parking : serveur complet (Nginx HTTPS, Mosquitto TLS, MongoDB, WildFly)
+# Le même fichier sert en local (voie B) et sur la VM cloud (voie A).
+# Procédure : docs/installation-serveur.md
+#
+#   cd infra
+#   cp .env.example .env        # puis remplir les mots de passe
+#   ./scripts/generer-certificats.sh
+#   docker compose up -d --build
+
+name: smartparking
+
+services:
+
+  # Reverse proxy HTTPS : sert la PWA et transmet /api à WildFly
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./certbot-www:/var/www/certbot:ro
+      - ../pwa:/usr/share/nginx/html:ro
+    depends_on:
+      - wildfly
+
+  # Broker MQTT en TLS (8883), comptes « pi » et « serveur » avec mot de passe
+  mqtt:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "8883:8883"
+    environment:
+      MQTT_MDP_PI: ${MQTT_MDP_PI:?à définir dans .env}
+      MQTT_MDP_SERVEUR: ${MQTT_MDP_SERVEUR:?à définir dans .env}
+    command: ["sh", "/mosquitto/config/demarrer.sh"]
+    volumes:
+      - ./mosquitto:/mosquitto/config:ro
+      - ./certs:/mosquitto/certs:ro
+      - mqtt-donnees:/mosquitto/data
+
+  # Base de données, données gardées dans un volume Docker
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    # Par défaut accessible seulement depuis la machine elle-même (voir .env)
+    ports:
+      - "${MONGO_PORT_HOTE:-127.0.0.1:27017}:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_UTILISATEUR:?à définir dans .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_MOT_DE_PASSE:?à définir dans .env}
+    # Cache limité pour tenir sur une VM de 2 Go
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    volumes:
+      - mongo-donnees:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Serveur d'application Jakarta EE (application de test : GET /api/sante)
+  wildfly:
+    build: ../api
+    restart: unless-stopped
+    # Pas de port publié : on passe toujours par Nginx en HTTPS
+    environment:
+      MONGO_HOTE: mongo
+      MONGO_UTILISATEUR: ${MONGO_UTILISATEUR}
+      MONGO_MOT_DE_PASSE: ${MONGO_MOT_DE_PASSE}
+      MQTT_HOTE: mqtt
+      MQTT_MDP_SERVEUR: ${MQTT_MDP_SERVEUR}
+    depends_on:
+      - mongo
+      - mqtt
+
+volumes:
+  mongo-donnees:
+  mqtt-donnees:

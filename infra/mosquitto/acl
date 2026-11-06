@@ -1,0 +1,13 @@
+# Droits par compte (contrat docs/contrats.md, section 5.3)
+
+# Raspberry Pi : publie l'état des places, les événements et son statut ; lit la configuration
+user pi
+topic write parking/P1/places/#
+topic write parking/P1/evenements
+topic write parking/P1/pi/statut
+topic read parking/P1/config
+
+# Serveur Jakarta EE : lit tout le parking ; publie la configuration
+user serveur
+topic read parking/P1/#
+topic write parking/P1/config
