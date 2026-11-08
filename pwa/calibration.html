@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calibration des places - Smart Parking</title>
+  <meta name="theme-color" content="#0b5d5d">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/calibration.css">
+</head>
+<body>
+  <header class="entete">
+    <img src="icons/icon-192.png" alt="" width="40" height="40">
+    <h1>Smart Parking</h1>
+  </header>
+
+  <main class="calibration">
+    <h2>Calibration des places</h2>
+    <p class="intro">Dessine chaque place et chaque zone interdite sur la photo de référence prise par le Pi, puis exporte le fichier <code>places.json</code>.</p>
+
+    <div class="calibration-grille">
+      <div>
+        <div class="zone-dessin">
+          <p id="zone-vide" class="vide">Aucune photo chargée.</p>
+          <canvas id="canvas" hidden aria-label="Photo de la maquette : clique sur les coins des places"></canvas>
+        </div>
+        <p id="info-resolution" class="info"></p>
+        <div class="outils">
+          <button id="btn-annuler-point" class="bouton-secondaire" type="button">Annuler le dernier point</button>
+          <button id="btn-fermer" class="bouton" type="button">Fermer le polygone</button>
+          <button id="btn-effacer" class="bouton-secondaire" type="button">Effacer le tracé</button>
+        </div>
+      </div>
+
+      <aside class="panneau">
+        <label class="bouton bouton-fichier">
+          Choisir la photo
+          <input id="fichier-photo" type="file" accept="image/*" class="visuellement-cache">
+        </label>
+        <p id="aide" class="aide" role="status"></p>
+
+        <form id="formulaire" class="formulaire" hidden novalidate>
+          <fieldset class="categorie">
+            <legend>Ce polygone est</legend>
+            <label><input type="radio" name="categorie" value="place" checked> une place</label>
+            <label><input type="radio" name="categorie" value="zone"> une zone interdite</label>
+          </fieldset>
+          <label>Nom
+            <input id="champ-id" type="text" autocomplete="off" spellcheck="false">
+          </label>
+          <div id="bloc-place" class="bloc-place">
+            <label>Type
+              <select id="champ-type">
+                <option value="normale">normale</option>
+                <option value="pmr">pmr</option>
+                <option value="electrique">electrique</option>
+              </select>
+            </label>
+            <label>Durée maximale (minutes)
+              <input id="champ-duree" type="number" min="1" step="1" inputmode="numeric">
+            </label>
+          </div>
+          <p id="message-formulaire" class="erreur" role="alert"></p>
+          <div class="outils">
+            <button class="bouton" type="submit">Enregistrer</button>
+            <button id="btn-abandonner" class="bouton-secondaire" type="button">Modifier le tracé</button>
+          </div>
+        </form>
+
+        <h3>Éléments dessinés</h3>
+        <p id="compteur" class="info"></p>
+        <ul id="liste" class="liste"></ul>
+        <button id="btn-exporter" class="bouton" type="button">Exporter places.json</button>
+      </aside>
+    </div>
+  </main>
+
+  <script src="js/calibration.js" defer></script>
+</body>
+</html>
