@@ -76,11 +76,12 @@ Le serveur vérifie le rôle à chaque appel d'API : un conducteur n'accède jam
 ├── iot/      # Raspberry Pi : détection YOLO, occupation, client MQTT
 ├── api/      # Serveur Jakarta EE : API REST, JWT, guidage, MongoDB
 ├── pwa/      # Application web progressive (conducteur + exploitant)
-├── docs/     # Contrats (MQTT, API, polygones), UML, documentation, manuel
+├── infra/    # docker-compose : Nginx (HTTPS), Mosquitto (TLS), MongoDB, WildFly
+├── docs/     # User stories, contrats (MQTT, API, push, plan), installation, UML, manuel
 └── README.md
 ```
 
-> `iot/` est en place ; `api/`, `pwa/` et `docs/` sont créés au fil des sprints.
+Documents de référence : [user stories](docs/user-stories.md), [contrats d'interface](docs/contrats.md), [installation du serveur](docs/installation-serveur.md).
 
 ## Installation
 
@@ -98,7 +99,18 @@ Le format du fichier des places (polygones) est illustré par `iot/places.exempl
 
 ### Serveur et PWA
 
-Les procédures d'installation de la VM (Mosquitto TLS, WildFly, MongoDB, HTTPS) et de lancement de l'API et de la PWA seront ajoutées dans `docs/` au fil des sprints.
+**Serveur en ligne : https://smartparking-supcom.duckdns.org** (VM AWS eu-north-1, HTTPS Let's Encrypt). Aujourd'hui, il sert la page d'accueil de Nginx ; la PWA et l'API (`/api`) y seront déployées au sprint 2.
+
+Tout le serveur (Nginx en HTTPS, Mosquitto en TLS, MongoDB, WildFly) se lance avec Docker, en local comme sur la VM cloud :
+
+```bash
+cp infra/.env.example infra/.env          # puis remplir les mots de passe
+./infra/scripts/generer-certificats.sh
+cd infra && docker compose up -d --build
+cd .. && ./infra/scripts/verifier.sh      # → "Tout fonctionne."
+```
+
+Procédure complète (voie locale, VM AWS réellement installée, passage à Docker au sprint 2) : [`docs/installation-serveur.md`](docs/installation-serveur.md).
 
 ## Planning (10 sprints)
 
