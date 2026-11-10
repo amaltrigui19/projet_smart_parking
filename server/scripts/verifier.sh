@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Vérifie que le serveur fonctionne : HTTPS, API, MQTT en TLS, MongoDB.
-# Usage : ./infra/scripts/verifier.sh            (local)
-#         ./infra/scripts/verifier.sh <domaine>  (VM, depuis la VM ou depuis le PC)
+# Usage : ./server/scripts/verifier.sh            (local)
+#         ./server/scripts/verifier.sh <domaine>  (VM, depuis la VM ou depuis le PC)
 set -uo pipefail
 export MSYS_NO_PATHCONV=1
-cd "$(dirname "$0")/.."      # dossier infra/
+cd "$(dirname "$0")/.."      # dossier server/
 
 HOTE=${1:-localhost}
 set -a; . ./.env; set +a

@@ -2,7 +2,7 @@
 # Le même fichier sert en local (voie B) et sur la VM cloud (voie A).
 # Procédure : docs/installation-serveur.md
 #
-#   cd infra
+#   cd server
 #   cp .env.example .env        # puis remplir les mots de passe
 #   ./scripts/generer-certificats.sh
 #   docker compose up -d --build
@@ -22,7 +22,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
       - ./certbot-www:/var/www/certbot:ro
-      - ../pwa:/usr/share/nginx/html:ro
+      - ../frontend:/usr/share/nginx/html:ro
     depends_on:
       - wildfly
 
@@ -63,7 +63,7 @@ services:
 
   # Serveur d'application Jakarta EE (application de test : GET /api/sante)
   wildfly:
-    build: ../api
+    build: ../middleware
     restart: unless-stopped
     # Pas de port publié : on passe toujours par Nginx en HTTPS
     environment:

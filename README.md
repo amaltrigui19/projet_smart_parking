@@ -73,11 +73,14 @@ Le serveur vérifie le rôle à chaque appel d'API : un conducteur n'accède jam
 
 ```
 .
-├── iot/      # Raspberry Pi : détection YOLO, occupation, client MQTT
-├── api/      # Serveur Jakarta EE : API REST, JWT, guidage, MongoDB
-├── pwa/      # Application web progressive (conducteur + exploitant)
-├── infra/    # docker-compose : Nginx (HTTPS), Mosquitto (TLS), MongoDB, WildFly
-├── docs/     # User stories, contrats (MQTT, API, push, plan), installation, UML, manuel
+├── frontend/     # PWA (conducteur + exploitant) : HTML, CSS, JavaScript
+├── middleware/   # Serveur d'application Jakarta EE (WildFly), en modules Maven :
+│   ├── iam/      #   identité et accès : comptes, mots de passe, JWT, rôles
+│   ├── core/     #   métier : places, réservations, guidage, alertes, MongoDB, MQTT
+│   └── api/      #   routes REST (api.war)
+├── server/       # Infrastructure : Docker Compose, Nginx (HTTPS), Mosquitto (TLS), MongoDB, scripts de la VM
+├── iot/          # Raspberry Pi : caméra, détection YOLO, occupation, client MQTT
+├── docs/         # User stories, contrats (MQTT, API, push, plan), installation, UML, manuel
 └── README.md
 ```
 
@@ -104,10 +107,10 @@ Le format du fichier des places (polygones) est illustré par `iot/places.exempl
 Tout le serveur (Nginx en HTTPS, Mosquitto en TLS, MongoDB, WildFly) se lance avec Docker, en local comme sur la VM cloud :
 
 ```bash
-cp infra/.env.example infra/.env          # puis remplir les mots de passe
-./infra/scripts/generer-certificats.sh
-cd infra && docker compose up -d --build
-cd .. && ./infra/scripts/verifier.sh      # → "Tout fonctionne."
+cp server/.env.example server/.env        # puis remplir les mots de passe
+./server/scripts/generer-certificats.sh
+cd server && docker compose up -d --build
+cd .. && ./server/scripts/verifier.sh     # → "Tout fonctionne."
 ```
 
 Procédure complète (voie locale, VM AWS réellement installée, passage à Docker au sprint 2) : [`docs/installation-serveur.md`](docs/installation-serveur.md).

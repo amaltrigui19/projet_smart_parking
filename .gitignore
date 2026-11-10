@@ -15,11 +15,15 @@ iot/photos_test/
 iot/places.json
 .env
 
-# Serveur (infra/) : certificats, clés et secrets jamais dans Git
-infra/certs/
-infra/certbot-www/
+# Serveur (server/) : certificats, clés et secrets jamais dans Git
+server/certs/
+server/certbot-www/
 *.pem
 *.key
 
-# Java
-api/target/
+# Java (modules iam, core, api)
+target/
+
+# Éditeurs
+.idea/
+.vscode/

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Vérifie qu'un places.json respecte le contrat des polygones (docs/contrats.md §5.2).
 
-Usage : python pwa/outils/valider_places.py chemin/vers/places.json
+Usage : python frontend/outils/valider_places.py chemin/vers/places.json
 Code de sortie : 0 si le fichier est valide, 1 sinon.
 """
 import json

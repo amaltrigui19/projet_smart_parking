@@ -4,24 +4,26 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>tn.supcom.smartparking</groupId>
-    <artifactId>api</artifactId>
-    <version>0.1.0</version>
-    <packaging>war</packaging>
-    <name>Smart Parking - API</name>
+    <parent>
+        <groupId>tn.supcom.smartparking</groupId>
+        <artifactId>middleware</artifactId>
+        <version>0.1.0</version>
+    </parent>
 
-    <properties>
-        <maven.compiler.release>21</maven.compiler.release>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
+    <artifactId>api</artifactId>
+    <packaging>war</packaging>
+    <name>Smart Parking - API REST</name>
 
     <dependencies>
-        <!-- API Jakarta EE 11, fournie par WildFly à l'exécution -->
         <dependency>
-            <groupId>jakarta.platform</groupId>
-            <artifactId>jakarta.jakartaee-api</artifactId>
-            <version>11.0.0</version>
-            <scope>provided</scope>
+            <groupId>tn.supcom.smartparking</groupId>
+            <artifactId>iam</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tn.supcom.smartparking</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
 

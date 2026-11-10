@@ -14,8 +14,8 @@ Le projet a trois domaines techniques :
 | Domaine | Contenu | Dossier |
 |---|---|---|
 | **IoT et IA** | Caméra, Raspberry Pi, dataset, modèle YOLO, occupation, anomalies, client MQTT | `iot/` |
-| **Serveur** | VM cloud, Mosquitto, WildFly (Jakarta EE), MongoDB, API REST, JWT, guidage, alertes | `api/` |
-| **PWA** | Interface conducteur, interface exploitant, plan SVG, notifications push | `pwa/` |
+| **Serveur** | VM cloud, Mosquitto, WildFly (Jakarta EE), MongoDB, API REST, JWT, guidage, alertes | `server/` (infrastructure) et `middleware/` (modules `iam`, `core`, `api`) |
+| **PWA** | Interface conducteur, interface exploitant, plan SVG, notifications push | `frontend/` |
 
 Chaque semaine compte **trois créneaux** :
 
@@ -56,7 +56,7 @@ Notre méthode est l'**Extreme Programming (XP)** décrite dans le cahier des ch
 
 Le dépôt est unique (`projet_smart_parking`), branche protégée par convention : **on ne pousse jamais directement sur `main`**.
 
-1. **Une branche par personne et par créneau**, nommée `domaine/prénom-sprintN-créneau`, par exemple `iot/eya-s3-lunmar`, `api/amal-s3-lunmar`, `pwa/maissa-s3-lunmar`.
+1. **Une branche par personne et par créneau**, nommée `domaine/prénom-sprintN-créneau`, par exemple `iot/eya-s3-lunmar`, `middleware/amal-s3-lunmar`, `frontend/maissa-s3-lunmar`.
 2. **Au moins un commit à chaque créneau** (chacune commite à chaque créneau). Commits petits, message en français à l'impératif : « Ajoute le calcul du recouvrement boîte/polygone ».
 3. **Pull request vers `main`** à la fin du créneau. Elle décrit : ce qui est fait, comment le tester, ce qui reste.
 4. **Revue obligatoire par une autre personne** avant fusion, selon un tour fixe : **Eya relit Amal, Amal relit Maissa, Maissa relit Eya**. Le relecteur lance le code ou le test décrit dans la PR, il ne lit pas seulement le diff.
@@ -67,7 +67,7 @@ Le dépôt est unique (`projet_smart_parking`), branche protégée par conventio
 
 ### 2.3 Propriété des dossiers et conflits
 
-- Chaque dossier (`iot/`, `api/`, `pwa/`) a, à un instant donné, **une seule personne qui y écrit**. Le roulement garantit cela.
+- Chaque dossier (`iot/`, `server/`, `middleware/`, `frontend/`) a, à un instant donné, **une seule personne qui y écrit**. Le roulement garantit cela.
 - Les fichiers partagés (`docs/contrats.md`, `README.md`, `places.exemple.json`) sont **modifiés uniquement le vendredi** ou par une PR dédiée relue par les deux autres. Un changement de contrat sans accord des trois est interdit.
 - En cas de conflit Git : la personne qui a ouvert la PR le résout, le relecteur vérifie.
 
@@ -106,7 +106,7 @@ Une tâche est terminée seulement si :
 
 - Un groupe de discussion pour les messages courts ; les décisions importantes sont notées dans `docs/decisions.md` (date, décision, raison).
 - Les questions pour l'encadrant sont accumulées pendant la semaine et posées à la réunion de suivi.
-- Les bugs et les tâches sont suivis dans les *Issues* GitHub, avec l'étiquette du domaine (`iot`, `api`, `pwa`) et du sprint.
+- Les bugs et les tâches sont suivis dans les *Issues* GitHub, avec l'étiquette du domaine (`iot`, `server`, `middleware`, `frontend`) et du sprint.
 
 ---
 
@@ -154,7 +154,7 @@ Légende : **Eya = A**, **Amal = B**, **Maissa = C**. « Commun » = les trois e
 **Lun–Mar, ensemble :** écrire les *user stories* du conducteur et de l'exploitant, au format « en tant que… je veux… afin de… », chacune avec ses critères d'acceptation (ex. : « en tant que conducteur, je veux être guidé vers la place libre la plus proche, afin de gagner du temps »). Les ranger par priorité et par sprint dans `docs/user-stories.md`.
 
 **Eya (PWA)**
-- Créer `pwa/` : `index.html`, `manifest.json` (nom, icônes, couleurs, `display: standalone`), `service-worker.js` (mise en cache de la coquille de l'application).
+- Créer `frontend/` : `index.html`, `manifest.json` (nom, icônes, couleurs, `display: standalone`), `service-worker.js` (mise en cache de la coquille de l'application).
 - Vérifier avec Lighthouse que la PWA est **installable** sur mobile et sur ordinateur.
 - *Fini quand :* l'application s'installe et s'ouvre hors ligne sur une page d'accueil.
 
@@ -196,7 +196,7 @@ Légende : **Eya = A**, **Amal = B**, **Maissa = C**. « Commun » = les trois e
 - *Fini quand :* un message MQTT circule en TLS du Pi (ou d'un poste) vers la VM, et WildFly se connecte à MongoDB.
 
 **Amal (PWA, outil de calibration)**
-- Page `pwa/calibration.html` : afficher une photo de la maquette, dessiner des polygones à la souris/au doigt (clic pour chaque sommet), nommer chaque place, choisir son type (normale, PMR, électrique, réservée) et sa zone.
+- Page `frontend/calibration.html` : afficher une photo de la maquette, dessiner des polygones à la souris/au doigt (clic pour chaque sommet), nommer chaque place, choisir son type (normale, PMR, électrique, réservée) et sa zone.
 - Exporter au format du **contrat des polygones** (coordonnées normalisées ou en pixels, selon le contrat).
 - *Fini quand :* un polygone dessiné s'exporte en JSON valide, relu par un script.
 
@@ -220,7 +220,7 @@ Légende : **Eya = A**, **Amal = B**, **Maissa = C**. « Commun » = les trois e
 | Ven | Commun : intégration, pull requests, démo | idem | idem |
 
 - **Eya (IoT)** : annoter le **lot 2**.
-- **Amal (Serveur)** : collections MongoDB `parkings`, `places` (identifiant, type, polygone, zone), `zones` ; accès aux données via une couche DAO ; données d'exemple (*seed*) importables par script. Dans `api/`.
+- **Amal (Serveur)** : collections MongoDB `parkings`, `places` (identifiant, type, polygone, zone), `zones` ; accès aux données via une couche DAO ; données d'exemple (*seed*) importables par script. Dans `middleware/` (module `core`).
 - **Maissa (PWA)** : l'outil de calibration envoie les polygones à l'API (`POST /parkings/{id}/places`) ; affichage des polygones existants.
 - **Eya (PWA)** : page de connexion/inscription ; stockage du jeton JWT ; redirection **conducteur → front-office**, **exploitant → back-office** ; déconnexion.
 - **Amal (IoT)** : annoter le **lot 3**. *Tous : dataset complet, découpé en entraînement / validation / test.*

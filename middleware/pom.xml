@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>tn.supcom.smartparking</groupId>
+    <artifactId>middleware</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+    <name>Smart Parking - Middleware</name>
+
+    <!-- iam : identité et accès (comptes, JWT, rôles)
+         core : métier (places, réservations, guidage, alertes, MongoDB, MQTT)
+         api : routes REST, produit api.war -->
+    <modules>
+        <module>iam</module>
+        <module>core</module>
+        <module>api</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- API Jakarta EE 11, fournie par WildFly à l'exécution (héritée par les trois modules) -->
+        <dependency>
+            <groupId>jakarta.platform</groupId>
+            <artifactId>jakarta.jakartaee-api</artifactId>
+            <version>11.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Version récente : l'ancienne (3.1, par défaut de Maven 3.8) ignore maven.compiler.release -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

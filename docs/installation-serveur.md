@@ -18,8 +18,8 @@ Rédaction : Maissa · Sprint 1 · Remplace `docs/installation-vm.md` prévu dan
 
 | | **Aujourd'hui sur la VM** (sprint 1) | **Cible** (sprint 2) |
 |---|---|---|
-| Serveur web | Nginx de l'hôte (apt), page par défaut | Conteneur `nginx` de `infra/` : PWA + `/api` |
-| Certificat | `certbot --nginx` : Certbot modifie lui-même la configuration du Nginx de l'hôte | Même certificat `/etc/letsencrypt/`, copié dans `infra/certs/` pour les conteneurs `nginx` et `mqtt` |
+| Serveur web | Nginx de l'hôte (apt), page par défaut | Conteneur `nginx` de `server/` : PWA + `/api` |
+| Certificat | `certbot --nginx` : Certbot modifie lui-même la configuration du Nginx de l'hôte | Même certificat `/etc/letsencrypt/`, copié dans `server/certs/` pour les conteneurs `nginx` et `mqtt` |
 | API, MQTT, base | absents | Conteneurs `wildfly`, `mqtt` (8883), `mongo` |
 | Procédure | [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée) | [section 4](#4-passage-à-la-stack-docker-sur-la-vm-sprint-2) |
 
@@ -36,8 +36,8 @@ Raspberry Pi ─MQTT TLS 8883─▶ mqtt (Mosquitto)     mongo (127.0.0.1:27017)
 
 | Service | Image | Port ouvert | Rôle |
 |---|---|---|---|
-| `nginx` | `nginx:1.27-alpine` | 80, 443 | HTTPS, sert la PWA (`pwa/`), transmet `/api` à WildFly |
-| `wildfly` | construite depuis `api/` | aucun (derrière Nginx) | API Jakarta EE ; sprint 1 : `GET /api/sante` |
+| `nginx` | `nginx:1.27-alpine` | 80, 443 | HTTPS, sert la PWA (`frontend/`), transmet `/api` à WildFly |
+| `wildfly` | construite depuis `middleware/` | aucun (derrière Nginx) | API Jakarta EE ; sprint 1 : `GET /api/sante` |
 | `mqtt` | `eclipse-mosquitto:2` | 8883 | Broker MQTT en TLS, comptes `pi` et `serveur` |
 | `mongo` | `mongo:8.0` | 27017, **sur 127.0.0.1 seulement** | Base de données, volume persistant `mongo-donnees` |
 
@@ -46,14 +46,14 @@ Deux voies, **avec les mêmes fichiers** :
 - **Voie B, locale** : sur le PC, avec un certificat d'une autorité locale → [section 2](#2-voie-b--environnement-local-docker-desktop).
 - **Voie A, VM AWS** : HTTPS déjà en place → [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée), puis la stack Docker au sprint 2 → [section 4](#4-passage-à-la-stack-docker-sur-la-vm-sprint-2).
 
-Entre les deux voies, seules changent l'origine des fichiers `infra/certs/fullchain.pem` et `privkey.pem`, et la valeur de `DOMAINE` dans `.env`.
+Entre les deux voies, seules changent l'origine des fichiers `server/certs/fullchain.pem` et `privkey.pem`, et la valeur de `DOMAINE` dans `.env`.
 
 ---
 
 ## 1. Fichiers
 
 ```
-infra/
+server/
 ├── docker-compose.yml          # les 4 services
 ├── .env.example                # modèle des secrets → copier en .env (jamais commité)
 ├── nginx/nginx.conf            # HTTPS, redirection 80 → 443, proxy /api et /api/ws
@@ -67,10 +67,10 @@ infra/
 │   └── verifier.sh             # 6 vérifications automatiques
 ├── certs/                      # créé par les scripts, ignoré par Git
 └── certbot-www/                # VM : défi Let's Encrypt, ignoré par Git
-api/                            # application Jakarta EE (Dockerfile : Maven puis WildFly)
+middleware/                     # application Jakarta EE : modules iam, core, api (Dockerfile : Maven puis WildFly)
 ```
 
-**Secrets** : uniquement dans `infra/.env` et `infra/certs/`, tous deux dans `.gitignore`. Avant chaque commit, `git status` ne doit montrer ni `.env` ni `.pem`.
+**Secrets** : uniquement dans `server/.env` et `server/certs/`, tous deux dans `.gitignore`. Avant chaque commit, `git status` ne doit montrer ni `.env` ni `.pem`.
 
 ---
 
@@ -91,39 +91,39 @@ Toutes les commandes ci-dessous se tapent dans un terminal **Git Bash** (VS Code
 **Étape 1 : créer le fichier des secrets**
 
 ```bash
-cp infra/.env.example infra/.env
+cp server/.env.example server/.env
 openssl rand -hex 16      # à lancer 3 fois : un mot de passe par ligne à remplacer
-code infra/.env           # remplacer les 3 « a_remplacer » ; laisser DOMAINE=localhost
+code server/.env           # remplacer les 3 « a_remplacer » ; laisser DOMAINE=localhost
 ```
 
-Résultat attendu : `grep -c a_remplacer infra/.env` affiche `0`.
+Résultat attendu : `grep -c a_remplacer server/.env` affiche `0`.
 
 **Étape 2 : générer les certificats**
 
 ```bash
-./infra/scripts/generer-certificats.sh
+./server/scripts/generer-certificats.sh
 ```
 
 Résultat attendu :
 
 ```
-CA locale créée : infra/certs/ca.pem
-Certificat serveur créé : infra/certs/fullchain.pem et infra/certs/privkey.pem
+CA locale créée : server/certs/ca.pem
+Certificat serveur créé : server/certs/fullchain.pem et server/certs/privkey.pem
 Valable pour : DNS:localhost,IP:127.0.0.1,DNS:mqtt
 ```
 
-> Pour que le **Raspberry Pi** se connecte au broker du PC, ajouter l'adresse IP du PC : `./infra/scripts/generer-certificats.sh 192.168.1.20` (adresse donnée par `ipconfig`), puis autoriser le port 8883 dans le pare-feu Windows. Copier `infra/certs/ca.pem` sur le Pi (c'est un certificat public, pas un secret).
+> Pour que le **Raspberry Pi** se connecte au broker du PC, ajouter l'adresse IP du PC : `./server/scripts/generer-certificats.sh 192.168.1.20` (adresse donnée par `ipconfig`), puis autoriser le port 8883 dans le pare-feu Windows. Copier `server/certs/ca.pem` sur le Pi (c'est un certificat public, pas un secret).
 
 *Variante avec mkcert* (si vous préférez) : `winget install FiloSottile.mkcert`, `mkcert -install`, puis
-`mkcert -cert-file infra/certs/fullchain.pem -key-file infra/certs/privkey.pem localhost 127.0.0.1 mqtt` et
-`cp "$(mkcert -CAROOT)/rootCA.pem" infra/certs/ca.pem`.
+`mkcert -cert-file server/certs/fullchain.pem -key-file server/certs/privkey.pem localhost 127.0.0.1 mqtt` et
+`cp "$(mkcert -CAROOT)/rootCA.pem" server/certs/ca.pem`.
 
 **Étape 3 (facultative) : faire confiance à la CA locale dans Windows**
 
 Sans cette étape, le navigateur affiche « connexion non privée » (on peut cliquer sur *Continuer*). Avec elle, le cadenas est normal et le service worker de la PWA fonctionne sans avertissement. Dans **PowerShell** :
 
 ```powershell
-certutil -user -addstore Root infra\certs\ca.pem
+certutil -user -addstore Root server\certs\ca.pem
 ```
 
 Résultat attendu : une fenêtre de confirmation (cliquer *Oui*), puis `CertUtil: -addstore command completed successfully.` Redémarrer le navigateur. (Pour retirer la CA plus tard : `certmgr.msc` → *Autorités de certification racines de confiance* → *Smart Parking CA locale* → *Supprimer*.)
@@ -131,7 +131,7 @@ Résultat attendu : une fenêtre de confirmation (cliquer *Oui*), puis `CertUtil
 **Étape 4 : lancer les services**
 
 ```bash
-cd infra
+cd server
 docker compose up -d --build
 ```
 
@@ -149,7 +149,7 @@ La première fois, il faut 3 à 5 minutes (téléchargement des images, compilat
 **Automatique** (depuis la racine du dépôt, une trentaine de secondes après le démarrage, le temps que WildFly se lance) :
 
 ```bash
-./infra/scripts/verifier.sh
+./server/scripts/verifier.sh
 ```
 
 Résultat attendu (sortie réelle du 6 novembre) :
@@ -175,10 +175,10 @@ Tout fonctionne.
 
 ```bash
 # État des conteneurs : 4 lignes "Up", mongo "(healthy)"
-docker compose -f infra/docker-compose.yml ps
+docker compose -f server/docker-compose.yml ps
 
 # En-têtes HTTPS (sous Windows, --ssl-no-revoke est nécessaire avec une CA locale)
-curl -I --ssl-no-revoke --cacert infra/certs/ca.pem https://localhost/
+curl -I --ssl-no-revoke --cacert server/certs/ca.pem https://localhost/
 ```
 
 Résultat attendu :
@@ -194,20 +194,20 @@ X-Content-Type-Options: nosniff
 
 ```bash
 # API
-curl --ssl-no-revoke --cacert infra/certs/ca.pem https://localhost/api/sante
+curl --ssl-no-revoke --cacert server/certs/ca.pem https://localhost/api/sante
 # → {"statut":"ok","version":"0.1.0","mongo":"ok","mqtt":"ok","ts":"..."}
 ```
 
-Test MQTT en TLS avec deux terminaux Git Bash. Les clients Mosquitto sont dans le conteneur, rien à installer. Remplacer `<MDP_…>` par les valeurs de `infra/.env`.
+Test MQTT en TLS avec deux terminaux Git Bash. Les clients Mosquitto sont dans le conteneur, rien à installer. Remplacer `<MDP_…>` par les valeurs de `server/.env`.
 
 ```bash
 # Terminal 1 : le serveur écoute tout le parking
-cd infra
+cd server
 MSYS_NO_PATHCONV=1 docker compose exec mqtt mosquitto_sub -h localhost -p 8883 \
   --cafile /mosquitto/certs/ca.pem -u serveur -P <MDP_SERVEUR> -t 'parking/P1/#' -v
 
 # Terminal 2 : le Pi publie l'état d'une place (contrat 5.1)
-cd infra
+cd server
 MSYS_NO_PATHCONV=1 docker compose exec mqtt mosquitto_pub -h localhost -p 8883 \
   --cafile /mosquitto/certs/ca.pem -u pi -P <MDP_PI> -q 1 \
   -t parking/P1/places/A3 -m '{"place":"A3","etat":"occupee","depuis":"2026-11-20T10:02:11Z"}'
@@ -231,10 +231,10 @@ Contrôles de sécurité :
 ### 2.4 Arrêter, relancer, tout effacer
 
 ```bash
-cd infra
+cd server
 docker compose stop            # arrête (les données restent)
 docker compose start           # relance
-docker compose up -d --build   # après une modification du code de api/
+docker compose up -d --build   # après une modification du code de middleware/
 docker compose logs -f wildfly # suivre les journaux d'un service (Ctrl+C pour sortir)
 docker compose down            # supprime les conteneurs (les volumes restent)
 docker compose down -v         # ATTENTION : supprime aussi les données MongoDB et MQTT
@@ -516,16 +516,16 @@ Allumée en permanence, la VM coûterait environ 120 USD d'ici au 6 mai 2027, **
 
 ### 4.1 Le problème, et l'option retenue
 
-Le Nginx de l'hôte occupe déjà les ports 80 et 443, et le conteneur `nginx` de `infra/` les demande aussi : les deux ne peuvent pas tourner en même temps.
+Le Nginx de l'hôte occupe déjà les ports 80 et 443, et le conteneur `nginx` de `server/` les demande aussi : les deux ne peuvent pas tourner en même temps.
 
-**Option retenue : arrêter le Nginx de l'hôte et laisser le conteneur `nginx` servir les ports 80 et 443, avec le certificat de `/etc/letsencrypt/` copié dans `infra/certs/` par `certbot-deploy-hook.sh`.**
+**Option retenue : arrêter le Nginx de l'hôte et laisser le conteneur `nginx` servir les ports 80 et 443, avec le certificat de `/etc/letsencrypt/` copié dans `server/certs/` par `certbot-deploy-hook.sh`.**
 
 Pourquoi :
-- La VM utilise exactement la configuration déjà testée en local (`infra/nginx/nginx.conf`) : une seule configuration Nginx à maintenir.
+- La VM utilise exactement la configuration déjà testée en local (`server/nginx/nginx.conf`) : une seule configuration Nginx à maintenir.
 - Le même certificat sert aussi à Mosquitto sur le port 8883.
 - Garder le Nginx de l'hôte en reverse proxy devant le conteneur ajouterait une deuxième configuration, obligerait le conteneur à écouter sur d'autres ports et ferait diverger la VM de l'environnement local.
 
-Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **plugin nginx** de Certbot, qui a besoin du Nginx de l'hôte. Il faut le basculer en mode **webroot**. Le conteneur `nginx` sert déjà le dossier du défi (`/.well-known/acme-challenge/` → `infra/certbot-www/`).
+Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **plugin nginx** de Certbot, qui a besoin du Nginx de l'hôte. Il faut le basculer en mode **webroot**. Le conteneur `nginx` sert déjà le dossier du défi (`/.well-known/acme-challenge/` → `server/certbot-www/`).
 
 ### 4.2 Étapes prévues
 
@@ -553,11 +553,11 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
    ```bash
    sudo mkdir -p /opt/smartparking && sudo chown $USER: /opt/smartparking
    git clone https://github.com/amaltrigui19/projet_smart_parking.git /opt/smartparking
-   cd /opt/smartparking/infra
+   cd /opt/smartparking/server
    cp .env.example .env && chmod 600 .env
    nano .env      # DOMAINE=smartparking-supcom.duckdns.org + 3 mots de passe (openssl rand -hex 16)
    ```
-4. **Installer le script de copie du certificat et le lancer une fois.** Il copie `/etc/letsencrypt/live/smartparking-supcom.duckdns.org/{fullchain,privkey}.pem` dans `infra/certs/`. Comme les conteneurs ne tournent pas encore, il ne recharge rien.
+4. **Installer le script de copie du certificat et le lancer une fois.** Il copie `/etc/letsencrypt/live/smartparking-supcom.duckdns.org/{fullchain,privkey}.pem` dans `server/certs/`. Comme les conteneurs ne tournent pas encore, il ne recharge rien.
    ```bash
    sudo cp scripts/certbot-deploy-hook.sh /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
    sudo chmod 755 /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
@@ -574,7 +574,7 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 6. **Basculer le renouvellement en mode webroot**, puis vérifier :
    ```bash
    sudo certbot reconfigure --cert-name smartparking-supcom.duckdns.org \
-        --webroot -w /opt/smartparking/infra/certbot-www
+        --webroot -w /opt/smartparking/server/certbot-www
    sudo grep -E 'authenticator|installer' /etc/letsencrypt/renewal/smartparking-supcom.duckdns.org.conf
    # attendu : authenticator = webroot (et plus d'installer = nginx)
    sudo certbot renew --dry-run --no-random-sleep-on-renew
@@ -585,7 +585,7 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 8. **Tout vérifier** :
    ```bash
    sudo apt install -y mosquitto-clients
-   cd /opt/smartparking && ./infra/scripts/verifier.sh smartparking-supcom.duckdns.org   # → "Tout fonctionne."
+   cd /opt/smartparking && ./server/scripts/verifier.sh smartparking-supcom.duckdns.org   # → "Tout fonctionne."
    ```
    Depuis le PC : `curl -I https://smartparking-supcom.duckdns.org` → `200`, et https://smartparking-supcom.duckdns.org/api/sante → `{"statut":"ok",...}`.
 
@@ -593,7 +593,7 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 
 ### 4.3 MQTT (port 8883) avec le certificat Let's Encrypt
 
-- Mosquitto lit `infra/certs/fullchain.pem` et `privkey.pem`. Ce sont les mêmes fichiers que Nginx : il n'y a **pas de second certificat** à demander.
+- Mosquitto lit `server/certs/fullchain.pem` et `privkey.pem`. Ce sont les mêmes fichiers que Nginx : il n'y a **pas de second certificat** à demander.
 - La clé est lisible par le groupe 1883, l'utilisateur `mosquitto` du conteneur : `certbot-deploy-hook.sh` s'en charge.
 - À chaque renouvellement, le script recopie les fichiers, recharge Nginx et redémarre Mosquitto.
 - **Côté Raspberry Pi** : Let's Encrypt est reconnu par le système. On se connecte donc avec `--capath /etc/ssl/certs`, ou `tls_set()` sans argument en Python, sur `smartparking-supcom.duckdns.org:8883`. Aucun fichier de certificat n'est à copier sur le Pi.
@@ -607,16 +607,16 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 | Symptôme | Cause | Solution |
 |---|---|---|
 | `failed to connect to the docker API … dockerDesktopLinuxEngine` | Docker Desktop n'est pas lancé | Lancer Docker Desktop, attendre que la baleine ne bouge plus |
-| Le navigateur affiche « Votre connexion n'est pas privée » sur https://localhost | La CA locale n'est pas reconnue par Windows | `certutil -user -addstore Root infra\certs\ca.pem`, puis fermer et rouvrir le navigateur (étape 3 de 2.2) |
+| Le navigateur affiche « Votre connexion n'est pas privée » sur https://localhost | La CA locale n'est pas reconnue par Windows | `certutil -user -addstore Root server\certs\ca.pem`, puis fermer et rouvrir le navigateur (étape 3 de 2.2) |
 | `curl: (60) schannel: … CERT_TRUST_REVOCATION_STATUS_UNKNOWN` (Windows) | Le curl de Windows cherche une liste de révocation que la CA locale n'a pas | Ajouter `--ssl-no-revoke` (fait par `verifier.sh`) |
 | En PowerShell, `curl -I` donne une erreur de paramètre | `curl` = `Invoke-WebRequest` dans PowerShell 5 | Taper `curl.exe` |
 | `Error: Problem setting TLS options: File not found` avec `docker compose exec` dans Git Bash | Git Bash transforme `/mosquitto/...` en chemin Windows | Préfixer par `MSYS_NO_PATHCONV=1` |
 | `Bind for 0.0.0.0:443 failed: port is already allocated` | Un autre programme utilise 80, 443 ou 8883 | `netstat -ano \| findstr ":443 "` puis arrêter ce programme |
-| Nginx s'arrête : `cannot load certificate "/etc/nginx/certs/fullchain.pem"` | Certificats absents | `./infra/scripts/generer-certificats.sh` puis `docker compose restart nginx` |
+| Nginx s'arrête : `cannot load certificate "/etc/nginx/certs/fullchain.pem"` | Certificats absents | `./server/scripts/generer-certificats.sh` puis `docker compose restart nginx` |
 | `502 Bad Gateway` sur `/api/...` | WildFly démarre encore (10 à 30 s) ou a planté | Attendre, puis `docker compose logs wildfly` |
 | `/api/sante` répond `503` avec `"mongo":"ko"` ou `"mqtt":"ko"` | Le service indiqué ne tourne pas | `docker compose ps`, puis `docker compose logs mongo` (ou `mqtt`) |
 | `Connection Refused: not authorised` (MQTT) | Mauvais mot de passe, ou `.env` modifié sans recréer le conteneur | Vérifier `.env`, puis `docker compose up -d --force-recreate mqtt` |
-| Un message MQTT publié n'arrive jamais | L'ACL interdit ce topic à ce compte (refus silencieux) | Vérifier `infra/mosquitto/acl` et le contrat 5.3 |
+| Un message MQTT publié n'arrive jamais | L'ACL interdit ce topic à ce compte (refus silencieux) | Vérifier `server/mosquitto/acl` et le contrat 5.3 |
 | Journaux de `mqtt` : `unexpected eof while reading` venant de WildFly | Normal : `/api/sante` vérifie seulement que le port 8883 répond, sans faire la négociation TLS | Rien à faire |
 | MongoDB refuse le nouveau mot de passe mis dans `.env` | Le compte admin n'est créé qu'au **premier** démarrage, sur un volume vide | Changer le mot de passe dans `mongosh`, ou `docker compose down -v` (efface les données) |
 | `$'\r': command not found` | Script enregistré avec des fins de ligne Windows (CRLF) | `.gitattributes` force LF ; sinon `sed -i 's/\r$//' <fichier>` |

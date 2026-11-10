@@ -9,7 +9,7 @@ Base installable : coquille, manifeste, service worker, page hors ligne. Les int
 ## Structure
 
 ```
-pwa/
+frontend/
 ├── index.html            # coquille et page d'accueil
 ├── offline.html          # page de repli hors ligne
 ├── manifest.json         # nom, icônes, couleurs, display: standalone
@@ -22,7 +22,7 @@ pwa/
 ## Lancer en local
 
 ```bash
-cd pwa
+cd frontend
 python -m http.server 8080
 ```
 
@@ -53,7 +53,7 @@ Page de l'exploitant pour indiquer au Pi où se trouvent les places sur l'image 
 À refaire à chaque fois que la caméra ou la maquette bouge.
 
 ### Utilisation
-1. Ouvrir `pwa/calibration.html` dans Chrome (double-clic, aucun serveur nécessaire).
+1. Ouvrir `frontend/calibration.html` dans Chrome (double-clic, aucun serveur nécessaire).
 2. Cliquer sur **Choisir la photo** et charger la photo de référence prise par le Pi, en 640 × 480. Une autre résolution affiche un avertissement, car les polygones seraient décalés.
 3. Pour chaque place : cliquer sur ses 4 coins en faisant le tour, puis **Fermer le polygone**. Le formulaire propose le nom et le type suivants selon le plan (A1 pmr… B4 electrique) ; vérifier, puis **Enregistrer**.
 4. Pour une zone interdite : même chose, en cochant « une zone interdite » (nom proposé : `allee1`).
@@ -63,7 +63,7 @@ Raccourcis pendant le tracé : Entrée ferme le polygone, Retour arrière annule
 
 ### Vérifier le fichier
 ```bash
-python pwa/outils/valider_places.py chemin/vers/places.json
+python frontend/outils/valider_places.py chemin/vers/places.json
 ```
 Attendu : `[OK] ... Fichier conforme au contrat.` En cas d'erreur, le script indique la place et le problème.
 
