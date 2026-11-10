@@ -84,7 +84,7 @@ Le serveur vérifie le rôle à chaque appel d'API : un conducteur n'accède jam
 └── README.md
 ```
 
-Documents de référence : [user stories](docs/user-stories.md), [contrats d'interface](docs/contrats.md), [installation du serveur](docs/installation-serveur.md).
+Documents de référence : [user stories](docs/user-stories.md), [contrats d'interface](docs/contrats.md), [installation du serveur](docs/installation-serveur.md), [conception UML](docs/uml/README.md).
 
 ## Installation
 
