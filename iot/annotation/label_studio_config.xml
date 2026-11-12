@@ -1,0 +1,8 @@
+<!-- Configuration du projet Label Studio (Settings > Labeling Interface > Code).
+     Les noms "image" et "label" doivent rester ceux-ci : pre_annoter.py les utilise. -->
+<View>
+  <Image name="image" value="$image" zoom="true" zoomControl="true"/>
+  <RectangleLabels name="label" toName="image">
+    <Label value="voiture" background="#e4572e"/>
+  </RectangleLabels>
+</View>

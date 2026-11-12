@@ -1,0 +1,26 @@
+# Modèle de configuration du dataset pour l'entraînement YOLO (Ultralytics).
+#
+# À COPIER EN data.yaml AU SPRINT 4, une fois les 3 lots annotés et réunis :
+#     copy iot\dataset\data.yaml.exemple iot\dataset\data.yaml      (Windows)
+#     cp   iot/dataset/data.yaml.exemple iot/dataset/data.yaml      (Linux / Raspberry Pi)
+# puis entraîner :
+#     yolo detect train data=iot/dataset/data.yaml model=yolo11n.pt imgsz=640
+#
+# Seul ce fichier modèle est versionné : les images et les labels de iot/dataset/
+# ne vont jamais dans Git (licences, droits d'auteur).
+#
+# Pas de clé "path" : les chemins ci-dessous sont relatifs au dossier de ce fichier (iot/dataset/).
+# Chaque dossier "images/" doit avoir un dossier "labels/" voisin (même nom de fichier, extension .txt).
+
+# Au sprint 4, les lots 1, 2 et 3 sont répartis en entraînement / validation
+# (environ 80 % / 20 %, en gardant toutes les variantes d'une même scène du même côté).
+train: entrainement/images
+val: validation/images
+
+# Pour un premier essai rapide sur le seul lot 1, on peut remplacer les deux lignes par :
+# train: lot1/images
+# val: lot1/images
+
+# Une seule classe : la voiture (identifiant 0 dans tous les fichiers .txt)
+nc: 1
+names: ['voiture']
