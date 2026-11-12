@@ -1,0 +1,6 @@
+# Exclusions pour toy-car-detection (Roboflow, v4) : une image d'origine par ligne.
+# Les images sans voiture sont exclues à part (option --ignorer-vides) : visages, pièces, écrans.
+# Format : nom_d_origine  # raison
+20251213_204220_jpg  # capture d'écran avec des boîtes déjà dessinées
+20251213_204222_jpg  # capture d'écran avec des boîtes déjà dessinées
+20251213_204345_jpg  # visage d'une personne reconnaissable
