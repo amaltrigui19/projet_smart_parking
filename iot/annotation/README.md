@@ -173,7 +173,7 @@ Résultat attendu : la fenêtre affiche `Racine des images : …\iot\dataset`, p
    Ne pas changer les noms `image` et `label` : les scripts les utilisent.
 3. **Settings** → **Cloud Storage** → **Add Source Storage** :
    - *Storage Type* : **Local files** ;
-   - *Absolute local path* : `C:\Users\<vous>\Downloads\smart-parking-iot-S1\iot\dataset\pre_annotations\photos\images`. Le chemin doit se trouver sous la racine affichée au lancement ;
+   - *Absolute local path* : `<chemin du dépôt>\iot\dataset\pre_annotations\photos\images` (par exemple `C:\Users\<vous>\…\projet_smart_parking\iot\dataset\pre_annotations\photos\images`). Le chemin doit se trouver sous la racine affichée au lancement ;
    - **Add Storage**, puis **Check Connection**, qui doit afficher « Successfully connected ».
    - **Ne PAS cliquer sur *Sync Storage*** : cela créerait 21 tâches **sans** les pré-annotations. Ce stockage sert seulement à autoriser l'affichage des images.
 4. Revenir au projet → **Import** → choisir `iot\dataset\pre_annotations\photos\pre_annotations.label-studio.json` → **Import**.
@@ -224,7 +224,8 @@ Exemple avec l'oubli repéré sur `toycar_toy-car-21-Copy_jpeg` (camionnette rou
 4. Exporter en **JSON** dans `iot\dataset\exports\corrections_toycar.json`, convertir, puis **ranger les `.txt` corrigés dans `iot/annotation/corrections/`** (versionné : texte seulement) :
    ```
    python iot/annotation/label_studio.py depuis-ls --export iot/dataset/exports/corrections_toycar.json --sortie iot/dataset/exports/corrections_toycar --labels-seulement
-   copy iot\dataset\exports\corrections_toycar\labels\*.txt iotnnotation\corrections\n   ```
+   copy iot\dataset\exports\corrections_toycar\labels\*.txt iot\annotation\corrections\
+   ```
 5. Reconstruire la partie toycar du lot (commande de la section 4, avec `--corrections`), puis vérifier :
    ```
    python iot/annotation/verifier_dataset.py
