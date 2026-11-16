@@ -92,3 +92,17 @@
 .bouton-secondaire.petit { padding: .25rem .6rem; font-size: .9rem; }
 
 .calibration :focus-visible { outline: 2px solid #3fb3b3; outline-offset: 2px; }
+/* Messages de l'enregistrement sur le serveur (sprint 3) */
+.message-serveur:empty { display: none; }
+.message-serveur {
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  margin: .25rem 0 1rem;
+  border: 1px solid rgba(127, 127, 127, .35);
+}
+.message-serveur p { margin: 0; }
+.message-serveur ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+.message-serveur.succes { border-color: #3fb3b3; background: rgba(63, 179, 179, .12); }
+.message-serveur.erreur { border-color: #e5534b; background: rgba(229, 83, 75, .12); }
+.message-serveur.info { opacity: .9; }
+.liste li .bouton-secondaire.petit + .bouton-secondaire.petit { margin-left: -.2rem; }

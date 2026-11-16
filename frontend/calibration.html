@@ -18,7 +18,7 @@
 
   <main class="calibration">
     <h2>Calibration des places</h2>
-    <p class="intro">Dessine chaque place et chaque zone interdite sur la photo de référence prise par le Pi, puis exporte le fichier <code>places.json</code>.</p>
+    <p class="intro">Dessine chaque place et chaque zone interdite sur la photo de référence prise par le Pi, puis enregistre-les sur le serveur (ou exporte le fichier <code>places.json</code>).</p>
 
     <div class="calibration-grille">
       <div>
@@ -66,17 +66,23 @@
           <div class="outils">
             <button class="bouton" type="submit">Enregistrer</button>
             <button id="btn-abandonner" class="bouton-secondaire" type="button">Modifier le tracé</button>
+            <button id="btn-annuler-formulaire" class="bouton-secondaire" type="button">Annuler</button>
           </div>
         </form>
 
         <h3>Éléments dessinés</h3>
         <p id="compteur" class="info"></p>
         <ul id="liste" class="liste"></ul>
-        <button id="btn-exporter" class="bouton" type="button">Exporter places.json</button>
+        <div class="outils">
+          <button id="btn-enregistrer-serveur" class="bouton" type="button">Enregistrer sur le serveur</button>
+          <button id="btn-exporter" class="bouton-secondaire" type="button">Exporter places.json</button>
+        </div>
+        <div id="message-serveur" class="message-serveur" role="status" aria-live="polite"></div>
       </aside>
     </div>
   </main>
 
+  <script src="js/validation-places.js" defer></script>
   <script src="js/calibration.js" defer></script>
 </body>
 </html>
