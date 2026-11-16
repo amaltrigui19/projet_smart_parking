@@ -24,16 +24,16 @@
       <p>Places libres en temps réel, guidage jusqu'à votre place et réservation à distance.</p>
 
       <div class="choix">
-        <a class="carte" href="#conducteur" aria-disabled="true">
+        <div class="carte">
           <strong>Conducteur</strong>
           <span>Voir les places, réserver, être guidé</span>
-        </a>
-        <a class="carte" href="#exploitant" aria-disabled="true">
+        </div>
+        <div class="carte">
           <strong>Exploitant</strong>
           <span>Tableau de bord, alertes, statistiques</span>
-        </a>
+        </div>
       </div>
-      <p class="note">Les interfaces arrivent dans les prochains sprints.</p>
+      <p><a id="lien-espace" class="bouton" href="connexion.html">Se connecter ou créer un compte</a></p>
 
       <button id="btn-installer" class="bouton" type="button" hidden>Installer l'application</button>
     </section>
@@ -42,5 +42,6 @@
   <footer class="pied">Smart Parking · Cloud of Things · SUP'COM</footer>
 
   <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/accueil.js"></script>
 </body>
 </html>

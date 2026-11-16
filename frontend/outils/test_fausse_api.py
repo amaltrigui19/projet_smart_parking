@@ -1,4 +1,4 @@
-"""Tests de la fausse API (fausse_api.py) : GET/PUT /api/config/polygones selon le contrat §2.10.
+"""Tests de la fausse API (fausse_api.py) : polygones (contrat §2.10) et authentification (§2.5).
 
 Lancer depuis la racine du dépôt :
     python -m unittest frontend/outils/test_fausse_api.py -v
@@ -103,6 +103,53 @@ class TestFausseApi(unittest.TestCase):
         code, corps = self.appel("GET", "/calibration.html", jeton=None)
         self.assertEqual(code, 200)
         self.assertIn(b"Calibration des places", corps)
+
+    # ---------- Authentification (contrat §2.5) ----------
+    def connecter(self, email, mdp):
+        code, corps = self.appel("POST", "/api/auth/connexion", {"email": email, "mot_de_passe": mdp}, jeton=None)
+        return code, json.loads(corps)
+
+    def test_a_connexion_exploitant(self):
+        code, r = self.connecter("exploitant@exemple.tn", "exploitant123")
+        self.assertEqual(code, 200)
+        self.assertEqual((r["type"], r["expire_dans"], r["utilisateur"]["role"]), ("Bearer", 3600, "EXPLOITANT"))
+        # Le jeton obtenu ouvre /moi et les routes de l'exploitant.
+        code, corps = self.appel("GET", "/api/auth/moi", jeton=r["jeton"])
+        self.assertEqual((code, json.loads(corps)["email"]), (200, "exploitant@exemple.tn"))
+        code, _ = self.appel("PUT", "/api/config/polygones", VALIDE, jeton=r["jeton"])
+        self.assertEqual(code, 200)
+
+    def test_b_connexion_conducteur_refuse_polygones(self):
+        code, r = self.connecter("conducteur@exemple.tn", "conducteur123")
+        self.assertEqual((code, r["utilisateur"]["role"]), (200, "CONDUCTEUR"))
+        code, corps = self.appel("PUT", "/api/config/polygones", VALIDE, jeton=r["jeton"])
+        self.assertEqual((code, json.loads(corps)["erreur"]), (403, "acces_refuse"))
+
+    def test_c_mauvais_mot_de_passe_401(self):
+        code, r = self.connecter("exploitant@exemple.tn", "mauvais-mdp")
+        self.assertEqual((code, r["erreur"]), (401, "identifiants_invalides"))
+        code2, r2 = self.connecter("inconnu@exemple.tn", "mauvais-mdp")
+        self.assertEqual((code2, r2["message"]), (401, r["message"]))  # même message dans les deux cas
+
+    def test_d_inscription_puis_connexion(self):
+        corps = {"nom": "Sara Ben Ali", "email": "Sara@Exemple.tn", "mot_de_passe": "motdepasse8", "role": "EXPLOITANT"}
+        code, r = self.appel("POST", "/api/auth/inscription", corps, jeton=None)
+        r = json.loads(r)
+        self.assertEqual((code, r["role"], r["email"]), (201, "CONDUCTEUR", "sara@exemple.tn"))  # rôle ignoré
+        code, _ = self.appel("POST", "/api/auth/inscription", corps, jeton=None)
+        self.assertEqual(code, 409)
+        code, r = self.connecter("sara@exemple.tn", "motdepasse8")
+        self.assertEqual((code, r["utilisateur"]["nom"]), (200, "Sara Ben Ali"))
+
+    def test_e_inscription_invalide_400(self):
+        code, corps = self.appel("POST", "/api/auth/inscription",
+                                 {"nom": "X", "email": "x@exemple.tn", "mot_de_passe": "court"}, jeton=None)
+        self.assertEqual((code, json.loads(corps)["erreur"]), (400, "requete_invalide"))
+
+    def test_f_moi_sans_jeton_ou_jeton_bidon_401(self):
+        for jeton in (None, "bidon", "a.b.c"):
+            code, corps = self.appel("GET", "/api/auth/moi", jeton=jeton)
+            self.assertEqual((code, json.loads(corps)["erreur"]), (401, "non_authentifie"))
 
 
 if __name__ == "__main__":
