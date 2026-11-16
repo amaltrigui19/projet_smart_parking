@@ -1,29 +1,30 @@
 # Installation du serveur
 
-Rédaction : Maissa · Sprint 1 · Remplace `docs/installation-vm.md` prévu dans `repartition_travail.md`
+Rédaction : Maissa (sprint 1, VM et HTTPS) et Eya (sprint 2, stack Docker sur la VM) · Remplace `docs/installation-vm.md` prévu dans `repartition_travail.md`
 
-> **État actuel (vérifié le 6 novembre 2026)**
+> **État actuel (vérifié le 10 novembre 2026)**
 >
 > | | |
 > |---|---|
-> | URL | **https://smartparking-supcom.duckdns.org** (page d'accueil Nginx ; l'API arrive au sprint 2) |
+> | URL | **https://smartparking-supcom.duckdns.org** (la PWA) ; l'API répond sur `/api/sante` |
 > | Hébergement | AWS EC2, région **eu-north-1** (Stockholm), instance `smart-parking-vm` |
-> | Machine | **t3.small** (2 vCPU, 2 Gio), Ubuntu Server 24.04 LTS, disque 20 Gio gp3 |
+> | Machine | **t3.small** (2 vCPU, 2 Gio), Ubuntu Server 24.04 LTS, disque 20 Gio gp3, noyau Linux 7.0, swap de 2 Gio |
 > | Adresse | Elastic IP 13.49.171.243, nom DNS DuckDNS |
-> | Certificat | Let's Encrypt, **expire le 4 février 2027**, renouvelé automatiquement (`certbot.timer`) |
-> | Ports ouverts | **22** (SSH), **80** (HTTP → HTTPS), **443** (HTTPS). Le **8883** (MQTT) sera ouvert au sprint 2 |
-> | Logiciels | Nginx et Certbot installés **directement sur la VM** (paquets apt). Docker n'est pas encore installé |
+> | Certificat | Let's Encrypt, **expire le 4 février 2027**, renouvelé automatiquement (`certbot.timer`, méthode **webroot**), copié dans `server/certs/` par `certbot-deploy-hook.sh` |
+> | Ports ouverts | **22** (SSH), **80** (HTTP → HTTPS), **443** (HTTPS), **8883** (MQTT en TLS) |
+> | Logiciels | Docker 29.9 et Compose 5.7 ; 4 conteneurs : `nginx`, `mqtt`, `mongo` (**7.0**, voir 4.4), `wildfly`. Le Nginx de l'hôte est **désactivé** |
+> | Vérification | `verifier.sh` : « Tout fonctionne. » (6 contrôles sur 6, le 10 novembre à 22:24 UTC) |
 
-## 0. Ce qui tourne aujourd'hui, et ce qui tournera au sprint 2
+## 0. Ce qui tournait avant, et ce qui tourne depuis le sprint 2
 
-| | **Aujourd'hui sur la VM** (sprint 1) | **Cible** (sprint 2) |
+| | **Avant** (sprint 1, 6 novembre) | **Depuis le 10 novembre** (sprint 2) |
 |---|---|---|
 | Serveur web | Nginx de l'hôte (apt), page par défaut | Conteneur `nginx` de `server/` : PWA + `/api` |
-| Certificat | `certbot --nginx` : Certbot modifie lui-même la configuration du Nginx de l'hôte | Même certificat `/etc/letsencrypt/`, copié dans `server/certs/` pour les conteneurs `nginx` et `mqtt` |
+| Certificat | `certbot --nginx` : Certbot modifie lui-même la configuration du Nginx de l'hôte | Même certificat `/etc/letsencrypt/`, copié dans `server/certs/` pour les conteneurs `nginx` et `mqtt` ; renouvellement en mode webroot |
 | API, MQTT, base | absents | Conteneurs `wildfly`, `mqtt` (8883), `mongo` |
-| Procédure | [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée) | [section 4](#4-passage-à-la-stack-docker-sur-la-vm-sprint-2) |
+| Procédure | [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée) | [section 4](#4-passage-à-la-stack-docker-sur-la-vm-appliqué-le-10-novembre) |
 
-La **cible** est le même `docker-compose.yml` que celui testé en local :
+La stack est le même `docker-compose.yml` que celui testé en local :
 
 ```
                          ┌──────────────── machine (PC ou VM) ────────────────┐
@@ -39,12 +40,12 @@ Raspberry Pi ─MQTT TLS 8883─▶ mqtt (Mosquitto)     mongo (127.0.0.1:27017)
 | `nginx` | `nginx:1.27-alpine` | 80, 443 | HTTPS, sert la PWA (`frontend/`), transmet `/api` à WildFly |
 | `wildfly` | construite depuis `middleware/` | aucun (derrière Nginx) | API Jakarta EE ; sprint 1 : `GET /api/sante` |
 | `mqtt` | `eclipse-mosquitto:2` | 8883 | Broker MQTT en TLS, comptes `pi` et `serveur` |
-| `mongo` | `mongo:8.0` | 27017, **sur 127.0.0.1 seulement** | Base de données, volume persistant `mongo-donnees` |
+| `mongo` | `mongo:8.0` (**7.0 sur la VM**, voir 4.4) | 27017, **sur 127.0.0.1 seulement** | Base de données, volume persistant `mongo-donnees` |
 
 Deux voies, **avec les mêmes fichiers** :
 
 - **Voie B, locale** : sur le PC, avec un certificat d'une autorité locale → [section 2](#2-voie-b--environnement-local-docker-desktop).
-- **Voie A, VM AWS** : HTTPS déjà en place → [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée), puis la stack Docker au sprint 2 → [section 4](#4-passage-à-la-stack-docker-sur-la-vm-sprint-2).
+- **Voie A, VM AWS** : HTTPS en place → [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée), puis la stack Docker (faite le 10 novembre) → [section 4](#4-passage-à-la-stack-docker-sur-la-vm-appliqué-le-10-novembre).
 
 Entre les deux voies, seules changent l'origine des fichiers `server/certs/fullchain.pem` et `privkey.pem`, et la valeur de `DOMAINE` dans `.env`.
 
@@ -290,9 +291,11 @@ EC2 → **Groupes de sécurité** → `launch-wizard-1` → **Modifier les règl
 | SSH | 22 | 0.0.0.0/0 (mieux : « Mon IP ») | ouvert |
 | HTTP | 80 | 0.0.0.0/0 | ouvert |
 | HTTPS | 443 | 0.0.0.0/0 | ouvert (ajouté après coup, voir 5.2) |
-| TCP personnalisé | 8883 | 0.0.0.0/0 | **à ouvrir au sprint 2** (MQTT) |
+| TCP personnalisé | 8883 | 0.0.0.0/0 | ouvert le 10 novembre (MQTT en TLS) |
 
 Ne **jamais** ouvrir 27017 (MongoDB) ni 8080 (WildFly).
+
+> **Pour ajouter une règle** : cliquer sur *Ajouter une règle*, **sans modifier ni supprimer les autres**. Le 10 novembre, la règle SSH (22) a disparu au moment d'ajouter le 8883, et l'accès à la VM a été perdu jusqu'à ce qu'elle soit remise (voir 5.2). Après chaque modification, vérifier que les **quatre** lignes ci-dessus sont toujours là.
 
 > Docker contourne le pare-feu `ufw` d'Ubuntu. C'est donc le **groupe de sécurité AWS** qui protège la VM, et MongoDB n'écoute que sur `127.0.0.1`.
 
@@ -510,9 +513,9 @@ Allumée en permanence, la VM coûterait environ 120 USD d'ici au 6 mai 2027, **
 
 ---
 
-## 4. Passage à la stack Docker sur la VM (sprint 2)
+## 4. Passage à la stack Docker sur la VM (appliqué le 10 novembre)
 
-> **À ne pas appliquer maintenant.** C'est une tâche du sprint 2 (profil A). Cette section décrit l'option retenue et ses étapes.
+> **Appliqué le 10 novembre 2026** par Eya (sprint 2, profil A). Les étapes de 4.2 sont celles réellement suivies, avec trois écarts par rapport au plan initial, décrits en 4.4 (MongoDB 7.0, construction avant la coupure, `bash` pour `verifier.sh`).
 
 ### 4.1 Le problème, et l'option retenue
 
@@ -527,7 +530,7 @@ Pourquoi :
 
 Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **plugin nginx** de Certbot, qui a besoin du Nginx de l'hôte. Il faut le basculer en mode **webroot**. Le conteneur `nginx` sert déjà le dossier du défi (`/.well-known/acme-challenge/` → `server/certbot-www/`).
 
-### 4.2 Étapes prévues
+### 4.2 Étapes suivies
 
 1. **Swap de 2 Gio** : la VM n'en a pas, et WildFly avec MongoDB peut dépasser 2 Gio.
    ```bash
@@ -555,8 +558,12 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
    git clone https://github.com/amaltrigui19/projet_smart_parking.git /opt/smartparking
    cd /opt/smartparking/server
    cp .env.example .env && chmod 600 .env
-   nano .env      # DOMAINE=smartparking-supcom.duckdns.org + 3 mots de passe (openssl rand -hex 16)
+   sed -i 's/^DOMAINE=.*/DOMAINE=smartparking-supcom.duckdns.org/' .env
+   sed -i "s/^MONGO_MOT_DE_PASSE=.*/MONGO_MOT_DE_PASSE=$(openssl rand -hex 16)/" .env
+   sed -i "s/^MQTT_MDP_PI=.*/MQTT_MDP_PI=$(openssl rand -hex 16)/" .env
+   sed -i "s/^MQTT_MDP_SERVEUR=.*/MQTT_MDP_SERVEUR=$(openssl rand -hex 16)/" .env
    ```
+   Les mots de passe sont générés et écrits directement dans le fichier : ils ne s'affichent pas à l'écran. Vérification sans les montrer : `grep -c a_remplacer .env` → `0`, et `grep -E '^(MONGO_MOT_DE_PASSE|MQTT_MDP_PI|MQTT_MDP_SERVEUR)=.{32}$' .env | wc -l` → `3`. Le mot de passe `MQTT_MDP_PI` est à transmettre à la personne qui configure le Raspberry Pi, **par un canal privé** ; les deux autres ne quittent jamais la VM.
 4. **Installer le script de copie du certificat et le lancer une fois.** Il copie `/etc/letsencrypt/live/smartparking-supcom.duckdns.org/{fullchain,privkey}.pem` dans `server/certs/`. Comme les conteneurs ne tournent pas encore, il ne recharge rien.
    ```bash
    sudo cp scripts/certbot-deploy-hook.sh /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
@@ -565,11 +572,23 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
         /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
    ls -l certs/   # → fullchain.pem (644) et privkey.pem (640, groupe 1883)
    ```
-5. **Basculer du Nginx de l'hôte au conteneur.** Le site est coupé environ une minute.
+5. **Basculer du Nginx de l'hôte au conteneur.** On télécharge et on construit **avant** de couper le site, qui n'est alors indisponible que quelques secondes.
    ```bash
+   docker compose pull --ignore-buildable    # images nginx, mosquitto, mongo
+   docker compose build                      # image WildFly (Maven, 3 à 6 minutes la première fois)
+   ```
+   Créer le fichier local qui impose MongoDB 7.0 (voir 4.4), puis couper l'ancien Nginx et démarrer :
+   ```bash
+   cat > docker-compose.override.yml <<'EOF'
+   # Spécifique à la VM : MongoDB 8.0 refuse de démarrer sur le noyau Linux 7.0 (SERVER-121912).
+   services:
+     mongo:
+       image: mongo:7.0
+   EOF
+   docker compose config --images | grep mongo   # → mongo:7.0
    sudo systemctl disable --now nginx
-   docker compose up -d --build
-   docker compose ps                     # 4 services "Up"
+   docker compose up -d
+   docker compose ps                     # 4 services "Up", mongo "(healthy)"
    ```
 6. **Basculer le renouvellement en mode webroot**, puis vérifier :
    ```bash
@@ -580,13 +599,20 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
    sudo certbot renew --dry-run --no-random-sleep-on-renew
    # attendu : Congratulations, all simulated renewals succeeded
    ```
-   Si la ligne `installer = nginx` est restée, la retirer du fichier `.conf`, puis relancer le `--dry-run`.
-7. **Ouvrir le port 8883** dans le groupe de sécurité `launch-wizard-1` (règle TCP 8883, source 0.0.0.0/0).
+   La ligne `installer = nginx` est **restée** dans le fichier le 10 novembre : la retirer (avec une sauvegarde), puis relancer le `--dry-run` :
+   ```bash
+   F=/etc/letsencrypt/renewal/smartparking-supcom.duckdns.org.conf
+   sudo cp $F $F.bak
+   sudo sed -i '/^installer = nginx/d' $F
+   sudo certbot renew --dry-run --no-random-sleep-on-renew
+   ```
+7. **Ouvrir le port 8883** dans le groupe de sécurité `launch-wizard-1` (règle TCP 8883, source 0.0.0.0/0). **Ajouter** la règle sans modifier les autres, puis vérifier que SSH (22), HTTP (80) et HTTPS (443) y sont toujours (voir 3.4 et 5.2). Test depuis le PC : `Test-NetConnection smartparking-supcom.duckdns.org -Port 8883` → `TcpTestSucceeded : True`.
 8. **Tout vérifier** :
    ```bash
-   sudo apt install -y mosquitto-clients
-   cd /opt/smartparking && ./server/scripts/verifier.sh smartparking-supcom.duckdns.org   # → "Tout fonctionne."
+   sudo apt-get install -y mosquitto-clients
+   bash /opt/smartparking/server/scripts/verifier.sh smartparking-supcom.duckdns.org   # → "Tout fonctionne."
    ```
+   On lance le script avec `bash` : après un `git clone` depuis Windows, il n'a pas le droit d'exécution (`Permission denied` avec `./`).
    Depuis le PC : `curl -I https://smartparking-supcom.duckdns.org` → `200`, et https://smartparking-supcom.duckdns.org/api/sante → `{"statut":"ok",...}`.
 
 **Retour en arrière** si quelque chose ne marche pas : `docker compose down`, puis `sudo systemctl enable --now nginx`. Le Nginx de l'hôte n'a pas été modifié.
@@ -597,6 +623,42 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 - La clé est lisible par le groupe 1883, l'utilisateur `mosquitto` du conteneur : `certbot-deploy-hook.sh` s'en charge.
 - À chaque renouvellement, le script recopie les fichiers, recharge Nginx et redémarre Mosquitto.
 - **Côté Raspberry Pi** : Let's Encrypt est reconnu par le système. On se connecte donc avec `--capath /etc/ssl/certs`, ou `tls_set()` sans argument en Python, sur `smartparking-supcom.duckdns.org:8883`. Aucun fichier de certificat n'est à copier sur le Pi.
+- **Sans Raspberry Pi** : le compte `pi` n'est qu'un nom et un mot de passe. N'importe quel poste peut jouer son rôle, et c'est ce que fait `verifier.sh` (contrôle 4).
+
+### 4.4 Écarts par rapport au plan initial, et problèmes rencontrés (10 novembre)
+
+| Sujet | Ce qui s'est passé | Ce qu'on a fait |
+|---|---|---|
+| **MongoDB 8.0 refuse de démarrer** | Le conteneur `mongo` redémarrait en boucle (`Restarting (1)`). Journal : « MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility with this version of MongoDB » (fiche SERVER-121912, qui parle de « MongoDB 8.0+ »). Le noyau de la VM est le `7.0.0-1014-aws`. En local, Docker Desktop utilise un noyau plus ancien : d'où l'écart avec les tests de Maissa. | Fichier local **`server/docker-compose.override.yml`** qui impose `mongo:7.0` (Compose le charge tout seul). Il n'est **pas** dans Git : le problème ne concerne que le noyau de la VM. Si une base 8.0 a commencé à s'initialiser, supprimer d'abord son volume (`docker volume rm smartparking_mongo-donnees`) : une 7.0 ne peut pas ouvrir une base commencée par une 8.0. **À revoir** : si une version 8.x corrigée sort, retirer ce fichier. |
+| **Construction avant la coupure** | `docker compose up -d --build` aurait coupé le site pendant toute la construction (plusieurs minutes). | `pull` puis `build` pendant que l'ancien Nginx répond ; la coupure ne dure que le temps de `disable --now nginx` et `up -d`. |
+| **`verifier.sh` : `Permission denied`** | Les scripts n'ont pas le droit d'exécution après un clone depuis Windows. | Lancer avec `bash script.sh`. À corriger dans le dépôt (`git update-index --chmod=+x`) pour que `./script.sh` marche. |
+| **`installer = nginx` resté dans le renouvellement Certbot** | `certbot reconfigure` change la méthode (`webroot`) mais pas l'installateur. | Ligne supprimée (avec sauvegarde `.bak`), puis simulation de renouvellement réussie. |
+| **SSH coupé après l'ajout du port 8883** | La règle SSH (22) n'était plus dans le groupe de sécurité : `ssh` répondait `Connection timed out`, alors que le 443 passait. | Règle SSH (22, `0.0.0.0/0`) rajoutée. Voir 3.4 et 5.2. |
+
+**Ressources mesurées** avec les 4 conteneurs au repos : 964 Mo de mémoire utilisés sur 1,9 Go, 941 Mo disponibles, swap à 64 Ko sur 2 Go. Suffisant aujourd'hui ; à surveiller quand l'API fera du vrai travail.
+
+**Tenue au redémarrage** (vérifiée en lecture le 10 novembre) : Docker est `enabled`, le Nginx de l'hôte est `disabled`, le swap est actif (`swapon --show` : `/swapfile`, 2 Go ; sa ligne est ajoutée à `/etc/fstab` par l'étape 1) et les services du `docker-compose.yml` ont `restart: unless-stopped`. Un vrai redémarrage de la VM n'a pas été testé.
+
+### 4.5 Sortie du contrôle final
+
+Sortie de `verifier.sh` sur la VM, recopiée le 10 novembre 2026 :
+
+```
+1. HTTPS sur https://smartparking-supcom.duckdns.org/
+  [OK]    page d'accueil (PWA) : 200
+2. Redirection HTTP -> HTTPS
+  [OK]    http:// redirige vers https://smartparking-supcom.duckdns.org/
+3. API WildFly : GET /api/sante
+  [OK]    {"statut":"ok","version":"0.1.0","mongo":"ok","mqtt":"ok","ts":"2026-11-10T22:24:55Z"}
+4. MQTT en TLS (port 8883) : publication par 'pi', réception par 'serveur'
+  [OK]    message reçu : {"en_ligne":true,"fps":0,"temp_cpu":0}
+5. MQTT : connexion anonyme refusée
+  [OK]    connexion sans mot de passe refusée
+6. MongoDB
+  [OK]    ping MongoDB avec authentification
+
+Tout fonctionne.
+```
 
 ---
 
@@ -626,9 +688,9 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 | Symptôme | Cause | Solution |
 |---|---|---|
 | `https://` donne `ERR_CONNECTION_TIMED_OUT` alors que `http://` marche | **Port 443 absent du groupe de sécurité** : Nginx écoute bien, mais AWS bloque le trafic. C'est le problème rencontré le 6 novembre | Groupe de sécurité → règle entrante **HTTPS 443**, source 0.0.0.0/0 |
-| MQTT : `Connection timed out` sur le port 8883 | Port 8883 pas encore ouvert (normal jusqu'au sprint 2) | Ajouter la règle TCP 8883 (étape 7 de 4.2) |
+| MQTT : `Connection timed out` sur le port 8883 | La règle TCP 8883 manque dans le groupe de sécurité | Ajouter la règle (étape 7 de 4.2) ; test : `Test-NetConnection <domaine> -Port 8883` |
 | `ssh` : `UNPROTECTED PRIVATE KEY FILE` ou `Permission denied (publickey)` | Droits trop larges sur la clé, ou mauvais utilisateur | Commande `icacls` de 3.5 ; l'utilisateur est `ubuntu` |
-| `ssh` : `Connection timed out` | Instance arrêtée, ou port 22 restreint à une ancienne IP | Démarrer l'instance ; vérifier la règle SSH |
+| `ssh` : `Connection timed out` | Instance arrêtée, **règle SSH (22) absente ou restreinte à une autre IP**, ou réseau qui bloque la sortie vers le port 22 | `Test-NetConnection <ip> -Port 22` (échec) et `-Port 443` (succès) → c'est le groupe de sécurité : ajouter une règle SSH, 22, `0.0.0.0/0`. Si la règle est bonne : essayer un autre réseau (partage de connexion du téléphone). C'est arrivé le 10 novembre après l'ajout du 8883 |
 | Le domaine ne pointe pas vers la VM | Adresse DuckDNS fausse, ou Elastic IP dissociée | `Resolve-DnsName smartparking-supcom.duckdns.org` → doit donner `13.49.171.243` ; corriger sur duckdns.org |
 | Certbot : `Timeout during connect` ou `unauthorized` | Port 80 fermé, domaine faux, ou serveur web arrêté | Vérifier 3.4, le DNS (3.6) et `sudo systemctl status nginx` |
 | Certbot : `too many failed authorizations` | Limite de Let's Encrypt (5 échecs par heure) | Attendre 1 heure ; s'entraîner avec `--staging` |
@@ -637,7 +699,8 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 | Après le passage à Docker (4.2), le renouvellement échoue | Certbot utilise encore le plugin nginx de l'hôte | Étape 6 de 4.2 (`certbot reconfigure … --webroot`) |
 | Après le passage à Docker, `Bind for 0.0.0.0:80 failed` | Le Nginx de l'hôte tourne encore | `sudo systemctl disable --now nginx` |
 | La VM rame, WildFly redémarre seul | Mémoire pleine (2 Gio, sans swap) | Créer le swap (étape 1 de 4.2) ; `docker stats` |
-
+| `mongo` en `Restarting (1)` ; journal : `MongoDB cannot start: Linux kernel versions 6.19 and newer ...` | MongoDB 8.0 incompatible avec le noyau 6.19 ou plus récent (SERVER-121912) | `docker-compose.override.yml` avec `mongo:7.0` (voir 4.4), après avoir supprimé le volume vide `smartparking_mongo-donnees` |
+| `./server/scripts/verifier.sh` : `Permission denied` | Le script n'a pas le droit d'exécution après un clone depuis Windows | `bash server/scripts/verifier.sh <domaine>` |
 ---
 
 ## Annexe : alternative Azure
