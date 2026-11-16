@@ -15,11 +15,17 @@
     <name>Smart Parking - IAM (identité et accès)</name>
 
     <dependencies>
-        <!-- Driver officiel MongoDB (synchrone) : collection utilisateurs. Embarqué dans api.war. -->
+        <!-- Connexion MongoDB partagée (core/donnees/ConnexionMongo) : une seule connexion pour tous les DAO -->
+        <dependency>
+            <groupId>tn.supcom.smartparking</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Driver officiel MongoDB (synchrone), même version que core. Embarqué dans api.war. -->
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
-            <version>5.2.1</version>
+            <version>5.14.0</version>
         </dependency>
 
         <!-- Tests unitaires -->
