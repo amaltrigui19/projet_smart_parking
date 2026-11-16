@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_1.xsd"
+         version="6.1">
+
+    <!-- Applique @RolesAllowed / @PermitAll sur les ressources JAX-RS (sinon WildFly les ignore). -->
+    <context-param>
+        <param-name>resteasy.role.based.security</param-name>
+        <param-value>true</param-value>
+    </context-param>
+
+    <!-- Un jeton invalide, falsifié ou expiré est refusé par MicroProfile JWT AVANT JAX-RS :
+         on renvoie quand même le format d'erreur du contrat (§2.1), au lieu de la page HTML de WildFly. -->
+    <error-page>
+        <error-code>401</error-code>
+        <location>/erreurs/401</location>
+    </error-page>
+</web-app>
