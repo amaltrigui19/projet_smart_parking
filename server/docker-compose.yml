@@ -72,6 +72,15 @@ services:
       MONGO_MOT_DE_PASSE: ${MONGO_MOT_DE_PASSE}
       MQTT_HOTE: mqtt
       MQTT_MDP_SERVEUR: ${MQTT_MDP_SERVEUR}
+      # JWT (contrat §2.2) : clé privée pour signer ; la clé publique est lue par MicroProfile JWT
+      # dans le même dossier (middleware/api/.../microprofile-config.properties)
+      JWT_CLE_PRIVEE_FICHIER: /opt/smartparking/jwt/privee.pem
+      # Compte exploitant de démo, créé au démarrage s'il n'existe pas (laisser vide pour ne rien créer)
+      EXPLOITANT_EMAIL: ${EXPLOITANT_EMAIL:-}
+      EXPLOITANT_MOT_DE_PASSE: ${EXPLOITANT_MOT_DE_PASSE:-}
+    volumes:
+      # Clés générées par scripts/generer-cles-jwt.sh (dossier jwt/, ignoré par Git)
+      - ./jwt:/opt/smartparking/jwt:ro
     depends_on:
       - mongo
       - mqtt
