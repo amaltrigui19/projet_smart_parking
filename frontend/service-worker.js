@@ -1,5 +1,5 @@
 // Incrémenter CACHE_VERSION à chaque changement de la coquille pour renouveler le cache.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE = `smart-parking-${CACHE_VERSION}`;
 
 const COQUILLE = [

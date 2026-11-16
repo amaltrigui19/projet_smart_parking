@@ -12,8 +12,21 @@ const PLAN = [
   ["B1", "normale"], ["B2", "normale"], ["B3", "normale"], ["B4", "electrique"],
 ];
 const COULEURS = { normale: "#3fb3b3", pmr: "#5b8def", electrique: "#e3b341", zone: "#e5534b" };
+const PLAN_IDS = PLAN.map(([id]) => id);
 
-const etat = { image: null, points: [], places: [], zones: [], formulaireOuvert: false };
+// API (docs/contrats.md §2.10) : même domaine que la PWA, donc une adresse relative.
+const API_POLYGONES = "/api/config/polygones";
+// Jeton JWT : écrit par la page de connexion (sprint 3, Eya), lu ici. Contrat §1.2 : sessionStorage.
+// C'est le SEUL endroit à changer si la page de connexion range le jeton ailleurs.
+const STOCKAGE_JWT = () => window.sessionStorage;
+const CLE_JWT = "jwt";
+
+// resolution : [largeur, hauteur] de la photo, ou du fichier chargé depuis le serveur.
+// enEdition : élément retiré de la liste pendant qu'on le modifie (remis en place si on annule).
+const etat = {
+  image: null, resolution: null, points: [], places: [], zones: [],
+  formulaireOuvert: false, enEdition: null, nonEnregistre: false, envoiEnCours: false,
+};
 
 const el = (id) => document.getElementById(id);
 const canvas = el("canvas");
@@ -34,6 +47,8 @@ const messageFormulaire = el("message-formulaire");
 const liste = el("liste");
 const compteur = el("compteur");
 const btnExporter = el("btn-exporter");
+const btnEnregistrerServeur = el("btn-enregistrer-serveur");
+const messageServeur = el("message-serveur");
 
 const borner = (v, min, max) => Math.min(max, Math.max(min, v));
 const trier = (t) => [...t].sort((a, b) => a.id.localeCompare(b.id, "fr", { numeric: true }));
@@ -50,18 +65,22 @@ champFichier.addEventListener("change", () => {
   const url = URL.createObjectURL(fichier);
   const img = new Image();
   img.onload = () => {
-    const memeTaille = etat.image !== null &&
-      img.naturalWidth === canvas.width && img.naturalHeight === canvas.height;
+    annulerEdition(); // un élément en cours de modification reprend sa place avant toute décision
+    // La résolution connue vient d'une photo précédente ou du fichier chargé depuis le serveur.
+    const res = etat.resolution;
+    const memeTaille = res !== null && img.naturalWidth === res[0] && img.naturalHeight === res[1];
     const aDesElements = etat.places.length + etat.zones.length > 0;
     if (aDesElements && !memeTaille &&
-        !confirm("Cette photo n'a pas la même résolution : les polygones déjà dessinés seront effacés. Continuer ?")) {
+        !confirm(`Cette photo (${img.naturalWidth} × ${img.naturalHeight}) n'a pas la même résolution que les ` +
+                 `polygones (${res[0]} × ${res[1]}) : ils seront effacés. Continuer ?`)) {
       URL.revokeObjectURL(url);
       champFichier.value = "";
       return;
     }
-    if (!memeTaille) { etat.places = []; etat.zones = []; }
+    if (!memeTaille && aDesElements) { etat.places = []; etat.zones = []; etat.nonEnregistre = true; }
     if (etat.image) URL.revokeObjectURL(etat.image.src);
     etat.image = img;
+    etat.resolution = [img.naturalWidth, img.naturalHeight];
     etat.points = [];
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
@@ -105,9 +124,22 @@ canvas.addEventListener("pointerdown", (evt) => {
   toutMettreAJour();
 });
 
+// Si on modifiait un élément existant, il reprend sa place tel qu'il était.
+function annulerEdition() {
+  if (!etat.enEdition) return;
+  const { cat, element } = etat.enEdition;
+  (cat === "zone" ? etat.zones : etat.places).push(element);
+  etat.enEdition = null;
+  etat.points = [];
+}
+
 function annulerPoint() { etat.points.pop(); toutMettreAJour(); }
-function effacerTrace() { etat.points = []; toutMettreAJour(); }
-function fermerPolygone() { if (etat.points.length >= 3) ouvrirFormulaire(); }
+function effacerTrace() { etat.points = []; annulerEdition(); toutMettreAJour(); }
+function fermerPolygone() {
+  if (etat.points.length < 3) return;
+  // Si on retouche un élément existant, le formulaire reprend ses valeurs.
+  ouvrirFormulaire(etat.enEdition ? { cat: etat.enEdition.cat, ...etat.enEdition.element } : null);
+}
 
 btnAnnulerPoint.addEventListener("click", annulerPoint);
 btnEffacer.addEventListener("click", effacerTrace);
@@ -135,24 +167,37 @@ function proposerValeurs() {
     return;
   }
   const suivante = PLAN.find(([id]) => !utilises.has(id));
-  let id, type;
-  if (suivante) {
-    [id, type] = suivante;
-  } else {
-    let n = 1;
-    while (utilises.has(`P${n}`)) n++;
-    [id, type] = [`P${n}`, "normale"];
+  if (!suivante) {
+    // Toutes les places du plan sont dessinées : le serveur refuse une place hors du plan (contrat §2.10).
+    champId.value = "";
+    messageFormulaire.textContent = `Toutes les places du plan (${PLAN_IDS.join(", ")}) sont déjà dessinées. ` +
+      "Supprime ou modifie une place existante, ou choisis « zone interdite ».";
+    return;
   }
+  const [id, type] = suivante;
   champId.value = id;
   champType.value = type;
   champDuree.value = DUREE_PAR_DEFAUT[type];
 }
 
-function ouvrirFormulaire() {
+// valeurs : élément existant à modifier ({ cat, id, type, duree_max_min }), sinon on propose les suivantes.
+function ouvrirFormulaire(valeurs = null) {
   etat.formulaireOuvert = true;
   formulaire.hidden = false;
   messageFormulaire.textContent = "";
-  proposerValeurs();
+  if (valeurs) {
+    formulaire.elements.categorie.value = valeurs.cat;
+    blocPlace.hidden = valeurs.cat === "zone";
+    champId.value = valeurs.id;
+    if (valeurs.cat === "place") {
+      champType.value = valeurs.type;
+      champDuree.value = valeurs.duree_max_min;
+    }
+  } else {
+    proposerValeurs();
+  }
+  // Sans photo, on ne peut pas retoucher les points : seulement le nom, le type et la durée.
+  el("btn-abandonner").disabled = !etat.image;
   toutMettreAJour();
   champId.focus();
   champId.select();
@@ -178,7 +223,8 @@ function verifierId(id) {
 formulaire.addEventListener("submit", (evt) => {
   evt.preventDefault();
   const id = champId.value.trim();
-  const erreur = verifierId(id);
+  const erreur = verifierId(id) || (categorie() === "place" && !PLAN_IDS.includes(id)
+    ? `La place ${id} n'existe pas dans le plan du parking (${PLAN_IDS.join(", ")}).` : "");
   if (erreur) { messageFormulaire.textContent = erreur; champId.focus(); return; }
   const poly = etat.points.map(([x, y]) => [x, y]);
   if (categorie() === "zone") {
@@ -193,6 +239,8 @@ formulaire.addEventListener("submit", (evt) => {
     etat.places.push({ id, type: champType.value, duree_max_min: duree, poly });
   }
   etat.points = [];
+  etat.enEdition = null;
+  etat.nonEnregistre = true;
   fermerFormulaire();
   toutMettreAJour();
 });
@@ -200,11 +248,34 @@ formulaire.addEventListener("submit", (evt) => {
 // « Modifier le tracé » : on garde les points pour pouvoir les corriger.
 el("btn-abandonner").addEventListener("click", () => { fermerFormulaire(); toutMettreAJour(); });
 
+// « Annuler » : on abandonne ce polygone (un élément existant reprend sa place, inchangé).
+el("btn-annuler-formulaire").addEventListener("click", () => {
+  etat.points = [];
+  annulerEdition();
+  fermerFormulaire();
+  toutMettreAJour();
+});
+
 // ---------- Liste ----------
 function supprimer(cat, id) {
   if (cat === "zone") etat.zones = etat.zones.filter((z) => z.id !== id);
   else etat.places = etat.places.filter((p) => p.id !== id);
+  etat.nonEnregistre = true;
   toutMettreAJour();
+}
+
+// « Modifier » : l'élément quitte la liste, ses points deviennent le tracé en cours et le formulaire
+// s'ouvre avec ses valeurs. « Annuler » le remet tel quel.
+function modifier(cat, id) {
+  if (etat.formulaireOuvert) return;
+  annulerEdition();
+  const tableau = cat === "zone" ? etat.zones : etat.places;
+  const element = tableau.find((e) => e.id === id);
+  if (!element) return;
+  tableau.splice(tableau.indexOf(element), 1);
+  etat.enEdition = { cat, element };
+  etat.points = element.poly.map(([x, y]) => [x, y]);
+  ouvrirFormulaire({ cat, ...element });
 }
 
 function afficherListe() {
@@ -223,16 +294,24 @@ function afficherListe() {
     texte.textContent = e.cat === "zone"
       ? `${e.id}, zone interdite`
       : `${e.id}, ${e.type}, ${e.duree_max_min} min`;
+    const btnModifier = document.createElement("button");
+    btnModifier.type = "button";
+    btnModifier.className = "bouton-secondaire petit";
+    btnModifier.textContent = "Modifier";
+    btnModifier.setAttribute("aria-label", `Modifier ${e.id}`);
+    btnModifier.disabled = etat.formulaireOuvert;
+    btnModifier.addEventListener("click", () => modifier(e.cat, e.id));
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "bouton-secondaire petit";
     btn.textContent = "Supprimer";
     btn.setAttribute("aria-label", `Supprimer ${e.id}`);
     btn.addEventListener("click", () => supprimer(e.cat, e.id));
-    li.append(pastille, texte, btn);
+    li.append(pastille, texte, btnModifier, btn);
     liste.append(li);
   }
-  compteur.textContent = `${etat.places.length} place(s), ${etat.zones.length} zone(s) interdite(s).`;
+  compteur.textContent = `${etat.places.length} place(s), ${etat.zones.length} zone(s) interdite(s).` +
+    (etat.nonEnregistre ? " Modifications non enregistrées sur le serveur." : "");
 }
 
 // ---------- Dessin ----------
@@ -291,14 +370,19 @@ function dessiner() {
   ctx.restore();
 }
 
-// ---------- Export ----------
-btnExporter.addEventListener("click", () => {
-  const donnees = {
+// ---------- Fichier places.json (contrat §5.2) ----------
+function construireFichier() {
+  return {
     parking: PARKING,
-    resolution: [canvas.width, canvas.height],
+    resolution: [...etat.resolution],
     places: trier(etat.places).map(({ id, type, duree_max_min, poly }) => ({ id, type, duree_max_min, poly })),
     zones_interdites: trier(etat.zones).map(({ id, poly }) => ({ id, poly })),
   };
+}
+
+// ---------- Export ----------
+btnExporter.addEventListener("click", () => {
+  const donnees = construireFichier();
   const blob = new Blob([JSON.stringify(donnees, null, 2) + "\n"], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -310,10 +394,138 @@ btnExporter.addEventListener("click", () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
+// ---------- Serveur : GET et PUT /api/config/polygones (contrat §2.10) ----------
+function lireJeton() {
+  try { return STOCKAGE_JWT().getItem(CLE_JWT); } catch { return null; }
+}
+function effacerJeton() {
+  try { STOCKAGE_JWT().removeItem(CLE_JWT); } catch { /* stockage indisponible : rien à effacer */ }
+}
+
+// Affiche un message dans le panneau. genre : "succes", "erreur" ou "info". details : liste de lignes.
+function afficherMessage(genre, texte, details = []) {
+  messageServeur.className = `message-serveur ${genre}`;
+  messageServeur.setAttribute("role", genre === "erreur" ? "alert" : "status");
+  messageServeur.replaceChildren();
+  const p = document.createElement("p");
+  p.textContent = texte;
+  messageServeur.append(p);
+  if (details.length) {
+    const ul = document.createElement("ul");
+    for (const d of details) {
+      const li = document.createElement("li");
+      li.textContent = d;
+      ul.append(li);
+    }
+    messageServeur.append(ul);
+  }
+}
+
+// Appel à l'API avec le JWT. Renvoie { statut, corps } ; statut 0 = serveur injoignable.
+async function appelerApi(methode, corps) {
+  const entetes = { Accept: "application/json" };
+  const jeton = lireJeton();
+  if (jeton) entetes.Authorization = `Bearer ${jeton}`;
+  if (corps !== undefined) entetes["Content-Type"] = "application/json";
+  let reponse;
+  try {
+    reponse = await fetch(API_POLYGONES, {
+      method: methode,
+      headers: entetes,
+      body: corps === undefined ? undefined : JSON.stringify(corps),
+      cache: "no-store",
+    });
+  } catch {
+    return { statut: 0, corps: null };
+  }
+  let json = null;
+  try { json = await reponse.json(); } catch { /* réponse sans JSON */ }
+  return { statut: reponse.status, corps: json };
+}
+
+// Messages communs à GET et PUT pour 401, 403, serveur injoignable et autres erreurs.
+function messageErreurCommune({ statut, corps }) {
+  if (statut === 0) {
+    return location.protocol === "file:"
+      ? "Page ouverte sans serveur (double-clic) : l'enregistrement est impossible. Lance la fausse API " +
+        "(python frontend/outils/fausse_api.py) puis ouvre http://localhost:8000/calibration.html."
+      : "Serveur injoignable : vérifie qu'il est lancé (ou la fausse API), puis réessaie.";
+  }
+  if (statut === 401) {
+    effacerJeton(); // contrat §1.2 : sur 401, la PWA efface le jeton
+    return "Non connecté, ou session expirée (401). Connecte-toi avec un compte exploitant, puis réessaie.";
+  }
+  if (statut === 403) return "Accès refusé (403) : cette page est réservée à l'exploitant.";
+  const detail = corps && corps.message ? ` : ${corps.message}` : "";
+  return `Erreur du serveur (${statut}${corps && corps.erreur ? `, ${corps.erreur}` : ""})${detail}`;
+}
+
+// Au chargement de la page : on récupère les polygones déjà enregistrés, s'il y en a.
+async function chargerDepuisServeur() {
+  if (location.protocol === "file:") {
+    afficherMessage("info", "Page ouverte sans serveur : tu peux dessiner et exporter places.json, " +
+      "mais pas enregistrer sur le serveur. Voir frontend/README.md (fausse API).");
+    return;
+  }
+  afficherMessage("info", "Recherche des polygones déjà enregistrés…");
+  const r = await appelerApi("GET");
+  if (r.statut === 404) {
+    afficherMessage("info", "Aucun fichier enregistré sur le serveur : on part d'un plan vide.");
+    return;
+  }
+  if (r.statut !== 200) { afficherMessage("erreur", messageErreurCommune(r)); return; }
+  const d = r.corps;
+  if (!d || !Array.isArray(d.places) || !Array.isArray(d.zones_interdites) || !Array.isArray(d.resolution)) {
+    afficherMessage("erreur", "Le serveur a renvoyé un fichier de polygones illisible : on part d'un plan vide.");
+    return;
+  }
+  if (etat.places.length + etat.zones.length > 0) {
+    afficherMessage("info", "Des polygones existent sur le serveur, mais tu as déjà commencé à dessiner : " +
+      "recharge la page pour les afficher.");
+    return;
+  }
+  etat.places = d.places.map(({ id, type, duree_max_min, poly }) => ({ id, type, duree_max_min, poly }));
+  etat.zones = d.zones_interdites.map(({ id, poly }) => ({ id, poly }));
+  etat.resolution = [d.resolution[0], d.resolution[1]];
+  etat.nonEnregistre = false;
+  afficherMessage("succes", `${etat.places.length} place(s) et ${etat.zones.length} zone(s) chargées depuis le ` +
+    `serveur. Choisis la photo de référence (${etat.resolution[0]} × ${etat.resolution[1]}) pour les voir et les modifier.`);
+  toutMettreAJour();
+}
+
+// « Enregistrer sur le serveur » : validation locale (mêmes règles que le serveur), puis PUT du fichier complet.
+btnEnregistrerServeur.addEventListener("click", async () => {
+  const donnees = construireFichier();
+  const erreurs = window.validerPlaces(donnees, PLAN_IDS);
+  if (erreurs.length) {
+    afficherMessage("erreur", `Le fichier n'est pas valide (${erreurs.length} problème(s)), rien n'a été envoyé :`, erreurs);
+    return;
+  }
+  etat.envoiEnCours = true;
+  majBoutons();
+  afficherMessage("info", "Envoi au serveur…");
+  const r = await appelerApi("PUT", donnees);
+  etat.envoiEnCours = false;
+  if (r.statut === 200) {
+    etat.nonEnregistre = false;
+    const heure = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    afficherMessage("succes", `Enregistré sur le serveur à ${heure} : ${donnees.places.length} place(s), ` +
+      `${donnees.zones_interdites.length} zone(s) interdite(s).`);
+  } else if (r.statut === 400 && r.corps && r.corps.erreur === "config_invalide") {
+    afficherMessage("erreur", "Le serveur a refusé le fichier (config_invalide) :",
+      String(r.corps.message || "").split(" ; ").filter(Boolean));
+  } else {
+    afficherMessage("erreur", messageErreurCommune(r));
+  }
+  toutMettreAJour();
+});
+
 // ---------- Mise à jour générale ----------
 function majAide() {
   const n = etat.points.length;
-  if (!etat.image) aide.textContent = "Commence par choisir la photo de référence de la maquette.";
+  if (!etat.image && etat.places.length + etat.zones.length > 0) {
+    aide.textContent = "Choisis la photo de référence pour voir et modifier les polygones chargés.";
+  } else if (!etat.image) aide.textContent = "Commence par choisir la photo de référence de la maquette.";
   else if (etat.formulaireOuvert) aide.textContent = "Donne un nom et un type à ce polygone, puis enregistre-le.";
   else if (n === 0) aide.textContent = "Clique sur les coins d'une place, dans l'ordre, en faisant le tour.";
   else if (n < 3) aide.textContent = `${n} point(s) placé(s). Il en faut au moins 3.`;
@@ -326,7 +538,9 @@ function majBoutons() {
   btnAnnulerPoint.disabled = n === 0 || ouvert;
   btnEffacer.disabled = n === 0 || ouvert;
   btnFermer.disabled = n < 3 || ouvert;
-  btnExporter.disabled = !etat.image || ouvert || etat.places.length + etat.zones.length === 0;
+  const rien = etat.resolution === null || ouvert || etat.places.length + etat.zones.length === 0;
+  btnExporter.disabled = rien;
+  btnEnregistrerServeur.disabled = rien || etat.envoiEnCours === true;
 }
 
 function toutMettreAJour() {
@@ -337,3 +551,4 @@ function toutMettreAJour() {
 }
 
 toutMettreAJour();
+chargerDepuisServeur();
