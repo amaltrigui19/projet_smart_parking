@@ -72,7 +72,8 @@ Critères d'acceptation :
 - Le trajet (entrée → allée → place) est dessiné sur le plan.
 - Les places PMR et électriques ne sont proposées qu'aux conducteurs qui ont l'autorisation correspondante.
 - La place proposée est **verrouillée 3 minutes** : elle n'est proposée à aucun autre conducteur pendant ce temps.
-- Si la place est prise entre-temps, un nouveau trajet est calculé et je suis prévenu.
+- En arrivant, je confirme avec le bouton « Je suis garé » ; le guidage se termine.
+- Si la place devient occupée sans ma confirmation dans les 60 secondes, le serveur considère qu'elle a été prise par quelqu'un d'autre : un nouveau trajet est calculé et je suis prévenu.
 - S'il n'y a aucune place libre, l'application affiche « parking complet ».
 
 ### US-04 · Réserver une place et annuler
@@ -237,6 +238,7 @@ Ces valeurs sont proposées ici ; elles seront reprises dans `docs/contrats.md` 
 | Valeur | Proposition |
 |---|---|
 | Durée du verrouillage de la place proposée (US-03) | 3 minutes |
+| Délai de confirmation « Je suis garé » (US-03) | 60 secondes |
 | Délai avant annulation d'une réservation si le conducteur n'arrive pas (US-04) | 15 minutes |
 | Préavis de la notification « fin de durée » (US-07) | 10 minutes |
 | Pi considéré hors ligne après (US-08) | 3 minutes sans statut |

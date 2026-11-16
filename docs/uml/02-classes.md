@@ -50,6 +50,7 @@ classDiagram
 
     class Verrou {
         +Date jusqu_a
+        +Date confirme_le
     }
 
     class Utilisateur {
@@ -121,6 +122,7 @@ classDiagram
         +float tarif_horaire
         +String devise
         +int verrou_min
+        +int confirmation_arrivee_s
         +int delai_reservation_min
         +int pi_hors_ligne_min
         +int preavis_fin_duree_min

@@ -189,6 +189,7 @@ Colonne « Rôle » des tableaux : **public** = sans jeton ; **connecté** = `CO
 | POST | `/api/guidage` | CONDUCTEUR | Place libre la plus proche, trajet et verrouillage | 7–8 |
 | GET | `/api/guidage` | CONDUCTEUR | Mon guidage en cours | 8 |
 | DELETE | `/api/guidage` | CONDUCTEUR | Abandonner le guidage (libère le verrou) | 8 |
+| POST | `/api/guidage/arrivee` | CONDUCTEUR | Confirmer « Je suis garé » sur la place proposée | 8 |
 | POST | `/api/reservations` | CONDUCTEUR | Réserver une place | 6 |
 | GET | `/api/reservations` | connecté | Mon historique (exploitant : toutes) | 6–7 |
 | GET | `/api/reservations/{id}` | connecté | Détail d'une réservation | 6 |
@@ -325,13 +326,18 @@ Règles :
 - Places `pmr` ou `electrique` : proposées seulement si le conducteur a l'autorisation correspondante, valide.
 - À égalité de distance, l'identifiant le plus petit dans l'ordre alphabétique gagne (`A1` avant `B1`).
 - La place est **verrouillée 3 minutes** (paramètre `verrou_min`). Un conducteur n'a qu'un verrou : un nouvel appel pendant le verrou renvoie la même place.
-- Le verrou disparaît quand la place devient `occupee` (le conducteur est arrivé), à l'expiration ou par `DELETE /api/guidage`.
-- Si la place est occupée par quelqu'un d'autre pendant le verrou, le serveur calcule un nouveau trajet et envoie la notification `place_prise` (section 3) avec la nouvelle place.
+- Le verrou disparaît à l'expiration, par `DELETE /api/guidage`, ou quand l'arrivée du conducteur est confirmée (voir ci-dessous).
+
+**Confirmation d'arrivée** (décision d'équipe du 16 novembre 2026). La caméra ne reconnaît ni plaques ni visages : quand la place verrouillée devient `occupee`, le serveur ne sait pas **qui** s'est garé. C'est donc le conducteur qui le confirme, avec le bouton « Je suis garé » de la PWA (`POST /api/guidage/arrivee`).
+- **Arrivée confirmée** : si la place devient `occupee` et que le conducteur confirme, dans un sens ou dans l'autre, à moins de `confirmation_arrivee_s` secondes d'écart (60 par défaut), le guidage est terminé et le verrou supprimé.
+- **Pas de confirmation** : si la place devient `occupee` et que le conducteur ne confirme pas dans les `confirmation_arrivee_s` secondes, le serveur considère que **quelqu'un d'autre** a pris la place : il calcule un nouveau trajet, verrouille la nouvelle place et envoie la notification `place_prise` (section 3).
+- **Confirmation sans occupation** : si le conducteur confirme mais que la place reste `libre`, rien ne change ; le verrou expire normalement (le conducteur s'est peut-être garé ailleurs).
 
 Erreurs : `409 parking_complet` (aucune place possible pour ce conducteur), `400 requete_invalide` (`depart` inconnu).
 
 **`GET /api/guidage`** · CONDUCTEUR → `200` avec le même corps, ou `404 introuvable` s'il n'y a pas de guidage en cours.
 **`DELETE /api/guidage`** · CONDUCTEUR → `204`.
+**`POST /api/guidage/arrivee`** · CONDUCTEUR (corps vide) → `200` `{ "place": "A2", "confirme_le": "2026-11-20T10:06:30Z" }`. Erreur : `404 introuvable` s'il n'y a pas de guidage en cours.
 
 ### 2.8 Réservations et paiement simulé
 
@@ -456,7 +462,7 @@ Erreur `400 config_invalide` si : identifiant en double, polygone de moins de 3 
 ```json
 {
   "tarif_horaire": 1.5, "devise": "TND",
-  "verrou_min": 3, "delai_reservation_min": 15,
+  "verrou_min": 3, "confirmation_arrivee_s": 60, "delai_reservation_min": 15,
   "preavis_fin_duree_min": 10, "pi_hors_ligne_min": 3
 }
 ```
@@ -535,7 +541,7 @@ Base `smartparking`. Les champs `_id` en texte (`"A1"`, `"P1"`) sont choisis par
 | Collection | Champs | Index |
 |---|---|---|
 | `parkings` | `_id` (`"P1"`), `nom`, `resolution` `[l, h]`, `dimensions_cm` `[l, h]`, `graphe` `{noeuds, aretes}` (4.3), `zones_interdites` `[{id, poly, rect_cm}]`, `parametres` (2.10), `pi` `{en_ligne, fps, temp_cpu, recu_le}`, `maj_le` | — |
-| `places` | `_id` (`"A1"`), `parking`, `type`, `duree_max_min`, `poly` (pixels, 5.2), `rect_cm` (plan, 4.3), `noeud`, `etat` (`libre`/`occupee`, venant du Pi), `depuis`, `verrou` `{utilisateur, jusqu_a}` ou `null` | `parking` |
+| `places` | `_id` (`"A1"`), `parking`, `type`, `duree_max_min`, `poly` (pixels, 5.2), `rect_cm` (plan, 4.3), `noeud`, `etat` (`libre`/`occupee`, venant du Pi), `depuis`, `verrou` `{utilisateur, jusqu_a, confirme_le}` ou `null` | `parking` |
 | `utilisateurs` | `_id`, `nom`, `email`, `mot_de_passe_hash` (PBKDF2 ou bcrypt), `role`, `actif`, `cree_le` | `email` unique |
 | `autorisations` | `_id`, `utilisateur`, `type` (`pmr`/`electrique`), `debut`, `fin`, `accordee_par` | `utilisateur` + `type` |
 | `reservations` | `_id`, `utilisateur`, `place`, `etat`, `creee_le`, `expire_le`, `debut`, `fin`, `montant`, `devise`, `paiement` `{moyen, paye_le, recu}` | `utilisateur` + `creee_le`, `place` + `etat` |
@@ -586,7 +592,7 @@ Les routes et le format général sont ceux de **1.5** (Eya). Cette section fixe
 | `reservation_confirmee` | conducteur concerné | `POST /api/reservations` réussi | « Réservation confirmée » / « La place B2 vous est réservée jusqu'à 10:13. » | `/conducteur#reservations` | `reservation`, `place` |
 | `fin_duree` | conducteur concerné | 10 min avant la fin de la durée maximale | « Fin de stationnement proche » / « Il vous reste 10 minutes sur la place B2. » | `/conducteur#reservations` | `reservation`, `place`, `fin_prevue` |
 | `place_a_liberer` | conducteur concerné | durée maximale dépassée | « Place à libérer » / « Votre durée sur la place B2 est dépassée. » | `/conducteur#reservations` | `reservation`, `place` |
-| `place_prise` | conducteur guidé | sa place verrouillée est prise | « Place prise » / « A2 a été prise. Nouvelle place : A3. » | `/conducteur#guidage` | `ancienne_place`, `place`, `trajet` |
+| `place_prise` | conducteur guidé | sa place verrouillée devient occupée sans confirmation d'arrivée dans les `confirmation_arrivee_s` secondes (2.7) | « Place prise » / « A2 a été prise. Nouvelle place : A3. » | `/conducteur#guidage` | `ancienne_place`, `place`, `trajet` |
 | `cheval` | tous les exploitants | événement `cheval` reçu du Pi | « Voiture à cheval » / « Une voiture occupe les places A3 et A4. » | `/exploitant#alertes` | `evenement`, `places` |
 | `ventouse` | tous les exploitants | durée maximale dépassée | « Véhicule ventouse » / « A2 occupée depuis 2 h 01 (max 2 h). » | `/exploitant#alertes` | `evenement`, `places`, `duree_min` |
 | `place_speciale` | tous les exploitants | place PMR ou électrique occupée sans autorisation | « Place spéciale » / « La place PMR A1 est occupée sans autorisation. » | `/exploitant#alertes` | `evenement`, `places`, `type_place` |

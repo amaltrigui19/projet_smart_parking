@@ -81,8 +81,8 @@ sequenceDiagram
     opt une réservation active sur A3
         API->>DB: réservation active passe à en_cours
     end
-    opt A3 était verrouillée pour un autre conducteur (guidage)
-        API->>API: voir le scénario 3, nouveau trajet et notification place_prise
+    opt A3 est verrouillée par le guidage
+        API->>API: attend la confirmation d'arrivée du conducteur guidé (voir le scénario 3)
     end
 
     PWA->>PWA: recolore la place A3 sur le plan SVG
@@ -90,7 +90,7 @@ sequenceDiagram
 
 ## 3. Guidage vers la place libre la plus proche (US-03)
 
-Contrat 2.7. Le plus court chemin est calculé avec Dijkstra dans le graphe de la maquette.
+Contrat 2.7. Le plus court chemin est calculé avec Dijkstra dans le graphe de la maquette. La caméra ne reconnaît pas les conducteurs : c'est le bouton « Je suis garé » qui permet au serveur de savoir si la place a été prise par le conducteur guidé ou par quelqu'un d'autre.
 
 ```mermaid
 sequenceDiagram
@@ -116,7 +116,15 @@ sequenceDiagram
         API-->>PWA: 200 place, distance_cm, trajet, verrou_jusqu_a
         PWA-->>C: trace le trajet sur le plan
 
-        opt un autre conducteur occupe la place pendant le verrou (voir scénario 2)
+        Note over API,DB: Plus tard, le Pi signale la place occupée (scénario 2)
+
+        alt le conducteur confirme son arrivée (moins de 60 s d'écart)
+            C->>PWA: appuie sur « Je suis garé »
+            PWA->>API: POST /api/guidage/arrivee
+            API->>DB: guidage terminé, verrou supprimé
+            API-->>PWA: 200 place, confirme_le
+            PWA-->>C: guidage terminé
+        else pas de confirmation après 60 s : quelqu'un d'autre a pris la place
             API->>API: nouveau calcul de trajet
             API->>DB: verrouille la nouvelle place
             API-)Push: notification place_prise
