@@ -1,6 +1,6 @@
 # Annotation du dataset — scripts et procédures
 
-Sprint 2 · Maissa (profil C)
+Sprint 2 · Maissa (profil C) · lot 3 synthétique : sprint 3 (Amal)
 
 Ce dossier contient les scripts qui fabriquent le dataset d'entraînement de YOLO (classe unique **`voiture`**) et la procédure pour le **reproduire avec sa propre clé API**. Les images et les labels produits vont dans `iot/dataset/`, qui **n'est jamais versionné** (licences et droits d'auteur). Sources, licences et chiffres : voir [`../README.md`](../README.md#dataset--lot-1).
 
@@ -16,6 +16,7 @@ Ce dossier contient les scripts qui fabriquent le dataset d'entraînement de YOL
 | `corrections/` | Labels corrigés à la main (un `.txt` YOLO par image, **sans image**), réappliqués par `--corrections` |
 | `label_studio.py` | Passerelle YOLO ↔ Label Studio : `vers-ls` (import à corriger) et `depuis-ls` (export corrigé → YOLO) |
 | `lancer_label_studio.bat` | Lance Label Studio en local sur http://localhost:8081, avec l'accès aux images de `iot/dataset/` |
+| `generer_synthetique.py` | Génère le **lot 3 synthétique** : la maquette vue du dessus, avec des boîtes exactes (section 6) |
 
 Toutes les commandes se lancent **depuis la racine du dépôt** (cmd, PowerShell ou Git Bash).
 
@@ -235,3 +236,48 @@ Exemple avec l'oubli repéré sur `toycar_toy-car-21-Copy_jpeg` (camionnette rou
 Comme les corrections sont versionnées, elles sont réappliquées à chaque reconstruction du lot depuis Roboflow.
 
 > Pour une seule boîte oubliée, on peut aussi faire proposer la boîte par YOLO-World, la vérifier en la dessinant, puis écrire la ligne YOLO dans `corrections/<image>.txt`. C'est ce qui a été fait pour `toy-car-21`.
+
+---
+
+## 6. Lot 3 synthétique (sprint 3)
+
+Le matériel de la maquette manque encore : le lot 3 est **généré** par `generer_synthetique.py`, en attendant les vraies photos.
+
+Le script dessine des images **640 × 480** de la maquette **vue du dessus**, avec la géométrie exacte du contrat (§4.3) : 60 × 40 cm, places A1 à B4 de 8 × 13 cm, allée centrale, zone interdite `allee1` hachurée, marquage PMR sur A1 et électrique sur B4. Il y place des voitures miniatures. Les boîtes sont calculées pendant le dessin, à partir du masque de chaque voiture : **elles sont exactes, il n'y a rien à corriger dans Label Studio**.
+
+| Ce qui varie | Pourquoi |
+|---|---|
+| Position, hauteur et rotation (± 4°) de la caméra | L'emplacement définitif de la caméra n'est pas encore connu |
+| Nombre, couleur, taille (7 à 10 cm) et orientation des voitures | Variété ; pas de voiture noire (protocole de `../maquette.md`) |
+| Voiture à cheval sur deux places (≈ 17 % des images) | Prépare la détection de l'anomalie `cheval` |
+| Voiture dans la zone interdite (≈ 15 %) | Prépare l'anomalie `zone_interdite` |
+| Voiture qui roule dans l'allée (≈ 15 %) | Une voiture n'est pas toujours garée |
+| Parking vide (≈ 7 %) | Exemples négatifs : YOLO apprend à ne rien détecter |
+| Sol, lumière, ombres, flou, bruit, compression JPEG | Imite les défauts d'une vraie webcam |
+
+### 6.1 Générer et vérifier
+
+```
+python iot/annotation/generer_synthetique.py --nombre 300
+python iot/annotation/verifier_dataset.py --dossier iot/dataset/lot3 --apercu 12
+```
+
+Résultats attendus : `Images écrites : 300`, `Voitures (boîtes) écrites : 1382`, puis `TOTAL 300 images, 1382 voitures` et `Aucune erreur : le lot est prêt.` Contrôler à l'œil les images de `iot/dataset/apercu/` : chaque voiture a une boîte ajustée, aucune boîte sur une zone vide.
+
+- **Reproductible** : la même graine (`--graine 3`, par défaut) donne les mêmes images sur tous les PC.
+- **Relancer remplace le lot** : `iot/dataset/lot3/images` et `labels` sont recréés, sans doublons.
+- Noms de fichiers : `synth_lot3_00001.jpg`… (préfixe `synth_`, avec `lot3` pour ne pas croiser les noms du lot 2).
+- `iot/dataset/lot3/scenarios.csv` décrit chaque image (`normal`, `vide`, `cheval`, `zone_interdite`) : ces images serviront de **cas de test pour la détection des anomalies**.
+
+### 6.2 Archiver
+
+```
+Compress-Archive -Path iot\dataset\lot3 -DestinationPath iot\dataset\lot3_<date>.zip
+(Get-FileHash iot\dataset\lot3_<date>.zip -Algorithm SHA256).Hash.Substring(0,8).ToLower()
+```
+
+Déposer le `.zip` dans le dossier Google Drive de l'équipe et ajouter une ligne au journal du `LISEZMOI` (date, fichier, 300 images, 1382 voitures, contenu, auteur, début de l'empreinte SHA-256).
+
+### 6.3 Quand la maquette sera prête
+
+Les vraies photos de la maquette compléteront le lot 3 (préfixe `maquette_`), avec la chaîne des sections 5.2 à 5.6 : pré-annotation par YOLO-World, correction dans Label Studio, puis `preparer_datasets.py --sortie iot/dataset/lot3 --nom maquette --seuil-doublons 0`. Les images synthétiques restent dans le dataset, en complément.
