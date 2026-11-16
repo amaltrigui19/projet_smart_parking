@@ -26,9 +26,9 @@ classDiagram
         +int duree_max_min
         +int[][] poly
         +int[] rect_cm
-        +String noeud
         +EtatPlace etat
         +Date depuis
+        +String /etat_affiche
     }
 
     class ZoneInterdite {
@@ -45,13 +45,10 @@ classDiagram
     }
 
     class Arete {
-        +String de
-        +String a
         +float longueur_cm
     }
 
     class Verrou {
-        +String utilisateur
         +Date jusqu_a
     }
 
@@ -98,6 +95,7 @@ classDiagram
         +Date debut
         +Date fin
         +Source source
+        +Object details
         +boolean traite
         +String traite_par
         +Date traite_le
@@ -121,7 +119,9 @@ classDiagram
 
     class Parametres {
         +float tarif_horaire
+        +String devise
         +int verrou_min
+        +int delai_reservation_min
         +int pi_hors_ligne_min
         +int preavis_fin_duree_min
     }
@@ -144,7 +144,6 @@ classDiagram
         <<enumeration>>
         libre
         occupee
-        reservee
     }
 
     class Role {
@@ -173,7 +172,7 @@ classDiagram
         serveur
     }
 
-    Parking "1" *-- "8" Place : contient
+    Parking "1" *-- "1..*" Place : contient
     Parking "1" *-- "0..*" ZoneInterdite : définit
     Parking "1" *-- "*" Noeud : graphe
     Parking "1" *-- "*" Arete : graphe
@@ -204,7 +203,9 @@ Notes de lecture :
 - **Imbriqués dans le document `parkings`** : le graphe (`Noeud`, `Arete`), les `ZoneInterdite`, les `Parametres` et le `PiStatut`.
 - **Imbriqués dans `places`** : le `Verrou` (`null` s'il n'y a pas de guidage en cours).
 - **Imbriqué dans `reservations`** : le `Paiement`.
-- L'état `reservee` d'une place n'est **pas** envoyé par le Pi : le serveur le calcule quand une place libre a une réservation active. Le Pi ne connaît que `libre` et `occupee`.
+- `etat` vaut seulement `libre` ou `occupee` (valeur stockée, venant du Pi). `/etat_affiche` est un attribut **dérivé** (le `/` en UML) : le serveur le calcule et vaut `reservee` quand une place libre a une réservation active, sinon la valeur de `etat`.
+- Les liens entre classes (le nœud d'une place, les deux nœuds d'une arête, l'utilisateur d'un verrou) sont représentés par les **associations** et ne sont pas répétés en attributs. En base, ils sont stockés sous forme d'identifiants (`noeud`, `de`, `a`, `utilisateur`, voir contrats 2.14).
+- `Parking` contient 8 places sur la maquette, mais leur nombre est configurable (US-13), d'où la multiplicité `1..*`.
 - `HistoriqueOccupation` contient un document par stationnement terminé, pour les statistiques.
 
 ## Cycle de vie d'une réservation
