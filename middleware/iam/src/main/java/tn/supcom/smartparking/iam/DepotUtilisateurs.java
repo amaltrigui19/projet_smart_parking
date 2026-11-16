@@ -13,6 +13,7 @@ import java.util.Date;
 import java.util.Optional;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import tn.supcom.smartparking.core.donnees.ConnexionMongo;
 
 /**
  * Accès à la collection {@code utilisateurs} (contrat §2.14) :
