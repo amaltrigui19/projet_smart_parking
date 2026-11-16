@@ -4,26 +4,26 @@ Source : [`server/docker-compose.yml`](../../server/docker-compose.yml), [`docs/
 
 ```mermaid
 flowchart LR
-    subgraph maquette ["Maquette du parking (sur site)"]
+    subgraph maquette ["«device» Maquette du parking (sur site)"]
         direction TB
-        cam["Caméra<br/>module Pi ou webcam USB"]
-        pi["Raspberry Pi 4<br/>Python, OpenCV, YOLO11n<br/>client MQTT"]
+        cam["«device» Caméra<br/>module Pi ou webcam USB"]
+        pi["«device» Raspberry Pi 4<br/>«artifact» script de détection Python<br/>OpenCV, YOLO11n, client MQTT"]
         cam -->|"images (jamais envoyées)"| pi
     end
 
-    subgraph vm ["VM AWS EC2 t3.small, Ubuntu 24.04, Docker Compose<br/>smartparking-supcom.duckdns.org, IP 13.49.171.243"]
+    subgraph vm ["«device» VM AWS EC2 t3.small, Ubuntu 24.04, Docker Compose<br/>smartparking-supcom.duckdns.org, IP 13.49.171.243"]
         direction TB
-        subgraph docker ["Conteneurs Docker"]
+        subgraph docker ["«executionEnvironment» Docker"]
             direction TB
-            nginx["nginx<br/>ports 80 et 443<br/>sert le frontend, proxy /api"]
-            wildfly["wildfly (api.war)<br/>port 8080, interne<br/>modules iam, core, api"]
-            mqtt["mqtt : Mosquitto<br/>port 8883, TLS<br/>comptes pi et serveur"]
-            mongo["mongo<br/>port 27017<br/>sur 127.0.0.1 seulement"]
+            nginx["«container» nginx<br/>ports 80 et 443<br/>«artifact» frontend (PWA), proxy /api"]
+            wildfly["«executionEnvironment» WildFly<br/>port 8080, interne<br/>«artifact» api.war<br/>modules iam, core, api (architecture cible)"]
+            mqtt["«container» Mosquitto<br/>port 8883, TLS<br/>comptes pi et serveur"]
+            mongo["«container» MongoDB<br/>port 27017<br/>sur 127.0.0.1 seulement"]
         end
-        certbot["Certbot sur l'hôte<br/>renouvellement webroot<br/>copie vers server/certs"]
+        certbot["«executionEnvironment» Certbot sur l'hôte<br/>renouvellement webroot<br/>copie vers server/certs"]
     end
 
-    nav["Navigateur ou mobile<br/>PWA : conducteur et exploitant"]
+    nav["«device» Navigateur ou mobile<br/>PWA : conducteur et exploitant"]
     le["Let's Encrypt<br/>certificat HTTPS et TLS"]
     dns["DuckDNS<br/>nom de domaine"]
     push["Service de push<br/>Google, Mozilla, Apple"]
@@ -36,12 +36,16 @@ flowchart LR
     wildfly -->|"abonné à parking/P1/#, publie parking/P1/config"| mqtt
     wildfly -.->|"Web Push, clés VAPID"| push
     push -.->|"notification"| nav
-    certbot -.->|"défi HTTP-01 sur le port 80"| le
+    certbot -.->|"demande de certificat (ACME, HTTPS)"| le
+    le -.->|"vérifie le défi HTTP-01 (port 80)"| nginx
+    certbot -.->|"écrit le défi dans certbot-www"| nginx
     le -.->|"certificat"| certbot
     certbot -.->|"fullchain.pem et privkey.pem"| nginx
     certbot -.->|"fullchain.pem et privkey.pem"| mqtt
-    dns -.->|"résout vers l'IP"| nav
+    nav -.->|"résolution du nom"| dns
 ```
+
+Notation : Mermaid n'a pas de diagramme de déploiement UML (nœuds en 3D). Les stéréotypes UML sont donc écrits dans les étiquettes : `«device»` pour une machine physique ou virtuelle, `«executionEnvironment»` pour un environnement d'exécution, `«artifact»` pour ce qui y est déployé.
 
 ## Ce que montre le diagramme
 

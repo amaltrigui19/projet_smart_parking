@@ -16,11 +16,10 @@ Source : [user stories](../user-stories.md) (US-01 à US-15) et cahier des charg
 ```mermaid
 flowchart LR
     conducteur(("Conducteur"))
-    pi(("Raspberry Pi"))
-    push(("Service de push"))
 
     subgraph systeme ["Système Smart Parking : conducteur"]
-        uc01(["US-01 S'inscrire et se connecter"])
+        uc01a(["US-01 S'inscrire"])
+        uc01b(["US-01 Se connecter"])
         uc02(["US-02 Voir les places libres en temps réel"])
         uc03(["US-03 Être guidé vers la place libre la plus proche"])
         uc04(["US-04 Réserver et annuler une place"])
@@ -30,7 +29,11 @@ flowchart LR
         detecter(["Détecter l'occupation de chaque place"])
     end
 
-    conducteur --- uc01
+    pi(("Raspberry Pi"))
+    push(("Service de push"))
+
+    conducteur --- uc01a
+    conducteur --- uc01b
     conducteur --- uc02
     conducteur --- uc03
     conducteur --- uc04
@@ -38,12 +41,10 @@ flowchart LR
     conducteur --- uc06
     conducteur --- uc07
 
-    pi --- detecter
-    push --- uc07
+    detecter --- pi
+    uc07 --- push
 
-    uc03 -.->|"inclut"| uc02
-    uc05 -.->|"suit"| uc04
-    uc02 -.->|"alimenté par"| detecter
+    uc03 -.->|"«include»"| uc02
 ```
 
 ## 2. Interface exploitant
@@ -51,22 +52,23 @@ flowchart LR
 ```mermaid
 flowchart LR
     exploitant(("Exploitant"))
-    pi(("Raspberry Pi"))
-    push(("Service de push"))
 
     subgraph systeme ["Système Smart Parking : exploitant"]
         uc01(["US-01 Se connecter"])
         uc08(["US-08 Suivre le tableau de bord"])
-        uc09(["US-09 Alerte voiture à cheval"])
-        uc10(["US-10 Alerte véhicule ventouse"])
-        uc11(["US-11 Alerte place spéciale sans autorisation"])
-        uc12(["US-12 Alerte véhicule en zone interdite"])
+        uc09(["US-09 Recevoir une alerte voiture à cheval"])
+        uc10(["US-10 Recevoir une alerte véhicule ventouse"])
+        uc11(["US-11 Recevoir une alerte place spéciale sans autorisation"])
+        uc12(["US-12 Recevoir une alerte véhicule en zone interdite"])
         uc13(["US-13 Configurer le parking"])
         uc14(["US-14 Gérer utilisateurs et autorisations"])
         uc15(["US-15 Consulter les statistiques"])
         anomalies(["Détecter les anomalies"])
         notifier(["Envoyer une notification push"])
     end
+
+    pi(("Raspberry Pi"))
+    push(("Service de push"))
 
     exploitant --- uc01
     exploitant --- uc08
@@ -78,20 +80,20 @@ flowchart LR
     exploitant --- uc14
     exploitant --- uc15
 
-    pi --- anomalies
-    push --- notifier
+    anomalies --- pi
+    notifier --- push
 
-    uc09 -.->|"déclenché par"| anomalies
-    uc12 -.->|"déclenché par"| anomalies
-    uc09 -.->|"utilise"| notifier
-    uc10 -.->|"utilise"| notifier
-    uc11 -.->|"utilise"| notifier
-    uc12 -.->|"utilise"| notifier
+    uc09 -.->|"«include»"| notifier
+    uc10 -.->|"«include»"| notifier
+    uc11 -.->|"«include»"| notifier
+    uc12 -.->|"«include»"| notifier
 ```
+
+Notation : les seules relations entre cas d'utilisation sont `«include»` (le cas de départ utilise toujours le cas d'arrivée). L'ordre dans le temps (payer après avoir réservé) et les flux de données (le Pi alimente l'état des places) ne sont pas des relations UML : ils sont décrits dans les [diagrammes de séquence](03-sequences.md). Les acteurs principaux sont à gauche, les acteurs secondaires (Raspberry Pi, Service de push) à droite.
 
 ## Remarques
 
-- **US-01** est partagée : un exploitant se connecte comme un conducteur, mais ne s'inscrit pas. Son compte est créé par un autre exploitant (US-14).
-- **Voiture à cheval** (US-09) et **zone interdite** (US-12) sont détectées par le **Pi**, qui les envoie en MQTT. **Ventouse** (US-10) et **place spéciale** (US-11) sont calculées par le **serveur** à partir de l'état des places, de la durée et des autorisations : elles n'ont donc pas de lien direct avec le Pi dans le diagramme.
+- **US-01** est partagée : un exploitant se connecte comme un conducteur, mais ne s'inscrit pas (d'où « S'inscrire » et « Se connecter » séparés côté conducteur). Son compte est créé par un autre exploitant (US-14).
+- **Voiture à cheval** (US-09) et **zone interdite** (US-12) sont détectées par le **Pi**, qui les envoie en MQTT. **Ventouse** (US-10) et **place spéciale** (US-11) sont calculées par le **serveur** à partir de l'état des places, de la durée et des autorisations : elles ne passent donc pas par le Pi.
 - Le conducteur reçoit lui aussi des notifications (US-07) : réservation confirmée, fin de durée, place à libérer, place prise.
 - Hors périmètre, selon le cahier des charges : reconnaissance de plaques ou de visages, verbalisation automatique, guidage routier dans la ville, paiements réels.
