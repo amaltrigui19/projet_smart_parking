@@ -13,4 +13,33 @@
     <artifactId>core</artifactId>
     <packaging>jar</packaging>
     <name>Smart Parking - Core (métier)</name>
+
+    <dependencies>
+        <!-- Driver officiel MongoDB (synchrone). WildFly ne le fournit pas :
+             il est embarqué dans api.war. -->
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongodb-driver-sync</artifactId>
+            <version>5.14.0</version>
+        </dependency>
+
+        <!-- Tests unitaires (JUnit 5), non embarqués dans api.war -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Surefire récent : la version par défaut (2.12.4) ne détecte pas les tests JUnit 5 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.2</version>
+            </plugin>
+        </plugins>
+    </build>
 </project>
