@@ -46,3 +46,39 @@ middleware/
         ├── ApiApplication.java    # JAX-RS, toutes les routes sous /api
         └── sante/SanteResource.java
 ```
+## Base MongoDB : parkings et places (sprint 3)
+
+Collections du contrat §2.14, dans `core/` :
+
+| Classe | Rôle |
+|---|---|
+| `modele/Parking`, `Place`, `ZoneInterdite` | Modèles, avec les règles de validation (polygone ≥ 3 points, durée > 0) |
+| `donnees/ConnexionMongo` | Connexion unique, configurée par les variables `MONGO_*` |
+| `donnees/ConversionMongo` | Traduction Java ↔ documents MongoDB (noms en snake_case du contrat) |
+| `donnees/DepotParkings`, `DepotPlaces` | DAO. `DepotPlaces.remplacerPolygones` enregistre une calibration sans effacer l'état des places |
+
+### Données d'exemple (seed)
+
+P1 et ses 8 places (contrat 4.3). Les polygones sont **provisoires** : ils sont calculés à partir du plan en cm, en attendant la calibration réelle.
+
+Depuis la racine du dépôt, MongoDB démarré (`docker compose -f server/docker-compose.yml up -d mongo`) :
+
+```bash
+# Linux / Git Bash
+./server/scripts/executer-mongo.sh server/mongo/seed.js     # remplit la base (relançable, sans doublons)
+./server/scripts/executer-mongo.sh server/mongo/relire.js   # affiche les places et leurs polygones
+```
+
+```powershell
+# Windows PowerShell
+.\server\scripts\executer-mongo.ps1 server\mongo\seed.js
+.\server\scripts\executer-mongo.ps1 server\mongo\relire.js
+```
+
+Résultat attendu : `Seed terminé : 1 parking, 8 places.`, puis 8 lignes de places et la zone `allee1`.
+
+### Tests
+
+```bash
+cd middleware && mvn test     # 6 tests de conversion Java ↔ MongoDB, sans base
+```
