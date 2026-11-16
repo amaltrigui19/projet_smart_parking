@@ -1,6 +1,8 @@
 # Annotation du dataset — scripts et procédures
 
-Sprint 2 · Maissa (profil C) · lot 3 synthétique : sprint 3 (Amal)
+Sprint 2 · Maissa (profil C) · mis à jour au sprint 3 (Eya ; lot 3 synthétique et découpage : Amal)
+
+Le dataset d'entraînement de YOLO a une classe unique, **`voiture`**, au format YOLO. Les images et les labels vont dans `iot/dataset/`, qui **n'est jamais versionné** (licences et droits d'auteur). Sources, licences et chiffres : voir [`../README.md`](../README.md#dataset--lot-1).
 
 Le **lot 1** est terminé et rangé dans le dossier Google Drive de l'équipe (section 2) : on ne le reconstruit plus. Les scripts ci-dessous servent aux **lots suivants** : pré-annoter, corriger à la main, convertir, vérifier.
 
@@ -9,7 +11,11 @@ Le **lot 1** est terminé et rangé dans le dossier Google Drive de l'équipe (s
 | `pre_annoter.py` | Pré-annote un dossier d'images avec YOLO-World (brouillon de boîtes à corriger) |
 | `label_studio_config.xml` | Interface d'annotation Label Studio (une étiquette : `voiture`) |
 | `lancer_label_studio.bat` | Lance Label Studio en local sur http://localhost:8081, avec l'accès aux images de `iot/dataset/` |
-| `generer_synthetique.py` | Génère le **lot 3 synthétique** : la maquette vue du dessus, avec des boîtes exactes (section 6) |
+| `label_studio.py` | Passerelle YOLO ↔ Label Studio : `vers-ls` (import à corriger) et `depuis-ls` (export corrigé → YOLO) |
+| `preparer_datasets.py` | Convertit un dossier YOLO vers la classe unique `voiture` et l'ajoute à un lot (`--sortie iot/dataset/lotN`) |
+| `verifier_dataset.py` | Contrôle un lot (format, doublons) et affiche les statistiques ; code 1 en cas d'erreur |
+| `generer_synthetique.py` | Génère le **lot 3 synthétique** : la maquette vue du dessus, avec des boîtes exactes (section 4) |
+| `decouper_dataset.py` | Réunit les lots et les découpe en entraînement / validation / test, de façon stable (section 5) |
 
 Toutes les commandes se lancent **depuis la racine du dépôt** (cmd, PowerShell ou Git Bash).
 
@@ -118,34 +124,9 @@ Règles d'annotation :
 
 `--seuil-doublons 0` : les boîtes ont été relues par un humain, on n'en fusionne aucune.
 
-### 5.7 Corriger quelques annotations de toy-car-detection
-
-Exemple avec l'oubli repéré sur `toycar_toy-car-21-Copy_jpeg` (camionnette rouge non annotée) :
-
-1. Créer le fichier d'import à partir des labels existants (on peut donner plusieurs noms) :
-   ```
-   python iot/annotation/label_studio.py vers-ls --dossier iot/dataset/lot1 --fichiers toycar_toy-car-21-Copy_jpeg --sortie iot/dataset/exports/corrections_toycar.label-studio.json
-   ```
-2. Dans Label Studio, créer un second projet `Lot 1 - corrections toy-car`, avec la même interface (5.4, étape 2). Ajouter un stockage *Local files* sur `…\iot\dataset\lot1\images`, sans *Sync*. Importer le fichier JSON.
-3. Corriger (ajouter la camionnette rouge), puis **Submit**.
-4. Exporter en **JSON** dans `iot\dataset\exports\corrections_toycar.json`, convertir, puis **ranger les `.txt` corrigés dans `iot/annotation/corrections/`** (versionné : texte seulement) :
-   ```
-   python iot/annotation/label_studio.py depuis-ls --export iot/dataset/exports/corrections_toycar.json --sortie iot/dataset/exports/corrections_toycar --labels-seulement
-   copy iot\dataset\exports\corrections_toycar\labels\*.txt iot\annotation\corrections\
-   ```
-5. Reconstruire la partie toycar du lot (commande de la section 4, avec `--corrections`), puis vérifier :
-   ```
-   python iot/annotation/verifier_dataset.py
-   ```
-   Résultat attendu : `Corrections manuelles : 1 (toycar_toy-car-21-Copy_jpeg)` (ou plus), puis `Aucune erreur`.
-
-Comme les corrections sont versionnées, elles sont réappliquées à chaque reconstruction du lot depuis Roboflow.
-
-> Pour une seule boîte oubliée, on peut aussi faire proposer la boîte par YOLO-World, la vérifier en la dessinant, puis écrire la ligne YOLO dans `corrections/<image>.txt`. C'est ce qui a été fait pour `toy-car-21`.
-
 ---
 
-## 6. Lot 3 synthétique (sprint 3)
+## 4. Lot 3 synthétique (sprint 3)
 
 Le matériel de la maquette manque encore : le lot 3 est **généré** par `generer_synthetique.py`, en attendant les vraies photos.
 
@@ -161,7 +142,7 @@ Le script dessine des images **640 × 480** de la maquette **vue du dessus**, av
 | Parking vide (≈ 7 %) | Exemples négatifs : YOLO apprend à ne rien détecter |
 | Sol, lumière, ombres, flou, bruit, compression JPEG | Imite les défauts d'une vraie webcam |
 
-### 6.1 Générer et vérifier
+### 4.1 Générer et vérifier
 
 ```
 python iot/annotation/generer_synthetique.py --nombre 300
@@ -175,7 +156,7 @@ Résultats attendus : `Images écrites : 300`, `Voitures (boîtes) écrites : 13
 - Noms de fichiers : `synth_lot3_00001.jpg`… (préfixe `synth_`, avec `lot3` pour ne pas croiser les noms du lot 2).
 - `iot/dataset/lot3/scenarios.csv` décrit chaque image (`normal`, `vide`, `cheval`, `zone_interdite`) : ces images serviront de **cas de test pour la détection des anomalies**.
 
-### 6.2 Archiver
+### 4.2 Archiver
 
 ```
 Compress-Archive -Path iot\dataset\lot3 -DestinationPath iot\dataset\lot3_<date>.zip
@@ -184,6 +165,40 @@ Compress-Archive -Path iot\dataset\lot3 -DestinationPath iot\dataset\lot3_<date>
 
 Déposer le `.zip` dans le dossier Google Drive de l'équipe et ajouter une ligne au journal du `LISEZMOI` (date, fichier, 300 images, 1382 voitures, contenu, auteur, début de l'empreinte SHA-256).
 
-### 6.3 Quand la maquette sera prête
+### 4.3 Quand la maquette sera prête
 
-Les vraies photos de la maquette compléteront le lot 3 (préfixe `maquette_`), avec la chaîne des sections 5.2 à 5.6 : pré-annotation par YOLO-World, correction dans Label Studio, puis `preparer_datasets.py --sortie iot/dataset/lot3 --nom maquette --seuil-doublons 0`. Les images synthétiques restent dans le dataset, en complément.
+Les vraies photos de la maquette compléteront le lot 3 (préfixe `maquette_`), avec la chaîne des sections 3.2 à 3.6 : pré-annotation par YOLO-World, correction dans Label Studio, puis `preparer_datasets.py --sortie iot/dataset/lot3 --nom maquette --seuil-doublons 0`. Les images synthétiques restent dans le dataset, en complément.
+
+---
+
+## 5. Découper le dataset : entraînement, validation, test
+
+Les lots sont réunis puis découpés en trois parties, **sans modifier les lots** :
+
+| Partie | Part | Rôle |
+|---|---|---|
+| `entrainement/` | 70 % | YOLO apprend sur ces images |
+| `validation/` | 15 % | Suivi pendant l'entraînement : choix du meilleur modèle, détection du sur-apprentissage |
+| `test/` | 15 % | **Jamais vu pendant l'entraînement** : évaluation finale du modèle (sprint 9) |
+
+### 5.1 Préparer et découper
+
+1. Récupérer les lots 1 et 2 depuis le Drive et les extraire dans `iot/dataset/` ; générer le lot 3 (section 4.1).
+2. Découper, puis vérifier chaque partie :
+   ```
+   python iot/annotation/decouper_dataset.py
+   python iot/annotation/verifier_dataset.py --dossier iot/dataset/entrainement
+   python iot/annotation/verifier_dataset.py --dossier iot/dataset/validation
+   python iot/annotation/verifier_dataset.py --dossier iot/dataset/test
+   ```
+   Le script affiche le nombre d'images par source et par partie, et écrit la liste complète dans `iot/dataset/decoupage.csv`.
+3. Copier `iot/dataset/data.yaml.exemple` en `iot/dataset/data.yaml` (il pointe vers les trois dossiers).
+
+### 5.2 Pourquoi un découpage par empreinte du nom
+
+Chaque image est placée d'après l'empreinte SHA-256 de son **nom**, et non par un tirage au hasard :
+- **même découpage sur tous les PC**, sans graine à partager ;
+- **stable quand on ajoute des images** : avec les photos réelles de la maquette (`--lots lot1 lot2 lot3 lot4`, ou un lot 3 complété), aucune image déjà placée ne change de partie. Une image de test reste en test : le modèle ne la verra jamais à l'entraînement ;
+- **chaque source est répartie dans les mêmes proportions** (toycar, carpk, synth, maquette…).
+
+Le script refuse deux images de même nom dans deux lots : les préfixes de fichiers doivent rester uniques (`synth_lot3_`, `maquette_`…). Les variantes d'une même photo ne doivent pas être séparées : le lot 1 n'en garde déjà qu'une par photo d'origine.
