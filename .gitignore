@@ -27,3 +27,10 @@ target/
 # Éditeurs
 .idea/
 .vscode/
+
+# Dataset IoT (images sous licence ou sous droits d'auteur : jamais dans Git)
+iot/dataset/*
+!iot/dataset/data.yaml.exemple
+iot/.env
+# Exports de Label Studio (ses données sont dans %USERPROFILE%\label-studio-data, hors du dépôt)
+*.label-studio.json

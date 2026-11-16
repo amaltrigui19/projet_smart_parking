@@ -1,5 +1,9 @@
-ultralytics>=8.3
-opencv-python
-shapely
-paho-mqtt>=2.0
-pyyaml
+# Partie IoT : pip install -r iot/requirements.txt
+ultralytics>=8.3      # YOLO (détection, pré-annotation YOLO-World, entraînement)
+opencv-python         # caméra (capture.py), lecture et dessin des images
+shapely               # recouvrement voiture / polygone des places
+paho-mqtt>=2.0        # client MQTT (TLS)
+pyyaml                # lecture des data.yaml (annotation/preparer_datasets.py)
+
+# Label Studio (correction des annotations) n'est PAS listé ici : il s'installe dans un
+# environnement Python séparé, pour ne pas casser ultralytics (voir annotation/README.md, section 5.1).
