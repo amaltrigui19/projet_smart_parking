@@ -8,12 +8,12 @@ Projet Maven à trois modules (parent : `pom.xml`) :
 | Module | Rôle | État |
 |---|---|---|
 | `iam/` | Identité et accès : comptes (collection `utilisateurs`), hachage PBKDF2, émission des JWT RS256, rôles `CONDUCTEUR` et `EXPLOITANT` | sprint 3 |
-| `core/` | Métier : places, réservations, guidage, alertes, accès MongoDB, client MQTT. Ne dépend pas de l'API REST | en cours (sprint 3, schéma MongoDB et DAO) |
-| `api/` | Routes REST (JAX-RS). Dépend de `iam` et de `core`, et produit `api.war` | `GET /api/sante`, `/api/auth/*` |
+| `core/` | Métier : places, réservations, guidage, alertes, accès MongoDB (connexion unique `ConnexionMongo`), client MQTT. Ne dépend pas de l'API REST | sprint 3 : schéma MongoDB et DAO |
+| `api/` | Routes REST (JAX-RS). Dépend de `iam` et de `core`, et produit `api.war` | `GET /api/sante`, `/api/auth/*`, `/api/config/polygones` |
 
-Dépendances : `api` → `iam`, `core`. `iam` et `core` sont indépendants l'un de l'autre.
+Dépendances : `api` → `iam`, `core` ; `iam` → `core` (pour la connexion MongoDB partagée, `core/donnees/ConnexionMongo`). `core` ne dépend d'aucun autre module. Tous utilisent le même driver : `mongodb-driver-sync` 5.14.0.
 
-## État (sprint 3) : authentification
+## État (sprint 3) : authentification et calibration
 
 | Route | Rôle | Réponses |
 |---|---|---|
@@ -21,6 +21,10 @@ Dépendances : `api` → `iam`, `core`. `iam` et `core` sont indépendants l'un 
 | `POST /api/auth/inscription` | public | `201` ; `400 requete_invalide` ; `409 email_existant`. Le compte créé est toujours `CONDUCTEUR` |
 | `POST /api/auth/connexion` | public | `200` (`jeton`, `type`, `expire_dans`, `utilisateur`) ; `401 identifiants_invalides` ; `403 compte_desactive` |
 | `GET /api/auth/moi` | connecté | `200` ; `401 non_authentifie` sans jeton valide |
+| `GET /api/config/polygones` | EXPLOITANT | `200` avec `places.json` (contrat §5.2) ; `404 introuvable` s'il n'y a rien |
+| `PUT /api/config/polygones` | EXPLOITANT | Corps : `places.json` en entier → `200` avec le fichier enregistré ; `400 config_invalide` ; `400 requete_invalide` (JSON mal formé) ; `404 introuvable` si le parking P1 n'existe pas (lancer le seed) |
+
+Pour les deux routes `/api/config/polygones` : `401 non_authentifie` sans jeton valide, `403 acces_refuse` pour un conducteur.
 
 Toutes les erreurs ont le format du contrat (§2.1) : `{"erreur": "code_court", "message": "texte lisible"}`, y compris quand WildFly refuse un jeton avant JAX-RS (page d'erreur 401 dans `web.xml`).
 
@@ -75,7 +79,7 @@ Procédure complète : [`docs/installation-serveur.md`](../docs/installation-ser
 
 ## Tester
 
-**Tests unitaires** (31 tests : hachage, JWT, validation des entrées), sans Java ni Maven sur le PC :
+**Tests unitaires** (57 tests : 6 dans `core`, 31 dans `iam` pour le hachage, le JWT et les entrées, 20 dans `api` pour la validation et la conversion des polygones), sans Java ni Maven sur le PC :
 
 ```bash
 docker run --rm -v "$PWD/middleware:/src" -v smartparking-m2:/root/.m2 -w /src maven:3.9-eclipse-temurin-21 mvn -B test
@@ -83,7 +87,7 @@ docker run --rm -v "$PWD/middleware:/src" -v smartparking-m2:/root/.m2 -w /src m
 
 (Git Bash sous Windows : préfixer par `MSYS_NO_PATHCONV=1`. Avec Java 21 et Maven installés : `cd middleware && mvn test`.)
 
-Attendu : `Tests run: 31, Failures: 0, Errors: 0` puis `BUILD SUCCESS`.
+Attendu : `Tests run: 6`, puis `Tests run: 31`, puis `Tests run: 20`, chaque fois avec `Failures: 0, Errors: 0`, puis `BUILD SUCCESS`.
 
 **Test réel des routes**, serveur lancé :
 
@@ -107,20 +111,62 @@ curl -k -X POST https://localhost/api/auth/connexion -H "Content-Type: applicati
 curl -k https://localhost/api/auth/moi -H "Authorization: Bearer <jeton>"
 ```
 
+## Calibration : `GET` et `PUT /api/config/polygones`
+
+C'est la route de la page de calibration (`frontend/calibration.html`). Le corps et la réponse ont le format de `places.json` (contrat §5.2) : `parking`, `resolution`, `places[id, type, duree_max_min, poly]`, `zones_interdites[id, poly]`.
+
+**Règles de `400 config_invalide`** (`api/config/ValidationPolygones`). Ce sont les mêmes que dans la page de calibration, la fausse API et `frontend/outils/valider_places.py` :
+- identifiant en double (places et zones confondues) ;
+- polygone de moins de 3 points, point non entier, point hors de `resolution` (de 0 à largeur − 1 et de 0 à hauteur − 1), polygone plat ;
+- `type` inconnu (`normale`, `pmr`, `electrique`) ;
+- `duree_max_min` qui n'est pas un entier ≥ 1 ;
+- place absente du plan (A1 à B4, contrat §4.3) ;
+- `parking` différent de `P1`.
+
+Toutes les erreurs sont dans `message`, séparées par ` ; ` : la page de calibration en affiche la liste.
+
+**En base**, le `PUT` fait deux choses :
+- les places passent par `DepotPlaces.remplacerPolygones` : type, durée et polygone sont mis à jour, **l'état venant du Pi est conservé**, et les places absentes du fichier sont supprimées ;
+- la résolution et les zones interdites passent par `DepotParkings.enregistrer` : le nom, les dimensions et le `rect_cm` (plan en cm) des zones existantes sont gardés.
+
+Le `GET` reconstruit le fichier depuis les deux collections, avec les places triées par identifiant. La publication du fichier au Pi (`parking/P1/config`, contrat §5.3) viendra au sprint suivant.
+
+**Tester**, serveur lancé et données d'exemple chargées (`./server/scripts/executer-mongo.sh server/mongo/seed.js`) :
+
+```bash
+EXPLOITANT_EMAIL=... EXPLOITANT_MOT_DE_PASSE=... ./server/scripts/tester-polygones.sh
+```
+
+Attendu : `15 vérification(s) réussie(s), 0 en échec`. Le script vérifie :
+- les rôles : 401 sans jeton, 403 pour un conducteur ;
+- un `PUT` valide, puis la relecture au format du contrat ;
+- en local, que l'état de A1 et le `rect_cm` de `allee1` sont conservés ;
+- `400 config_invalide` avec 6 erreurs dans le même message, et le JSON mal formé ;
+- qu'un `PUT` refusé ne modifie rien.
+
+Le fichier de départ est remis à la fin.
+
+**Relire pour la démo** (le jeton vient de `POST /api/auth/connexion` avec le compte exploitant) :
+
+```bash
+python frontend/outils/relire_polygones.py --url https://localhost --cacert server/certs/ca.pem --jeton <jwt-exploitant>
+```
+
+> Les polygones **provisoires** du seed (`server/mongo/seed.js`) touchent le bord de l'image : la rangée B a des points à `y = 480`, et `allee1` à `x = 640`. Une image en 640 × 480 va de 0 à 639 et de 0 à 479 : le serveur refuse donc de **réenregistrer** ces polygones tels quels, et `relire_polygones.py` les signale. Cela disparaît dès la vraie calibration ; la correction du seed est proposée à Amal (borner les points à 639 et 479).
+
 ## Structure
 
 ```
 middleware/
 ├── pom.xml                    # parent : Java 21, Jakarta EE 11, modules iam, core, api
 ├── Dockerfile                 # Maven (compilation) puis WildFly ; contexte = ce dossier
-├── iam/                       # dépend du driver MongoDB (mongodb-driver-sync)
+├── iam/                       # dépend de core (ConnexionMongo) et du driver mongodb-driver-sync 5.14.0
 │   ├── src/main/java/tn/supcom/smartparking/iam/
 │   │   ├── Utilisateur.java, Role.java
 │   │   ├── HachageMotDePasse.java       # PBKDF2
 │   │   ├── ValidationInscription.java   # nom, email, mot de passe
 │   │   ├── GenerateurJwt.java           # signature RS256 (JDK seul)
 │   │   ├── EmetteurJwt.java             # lit la clé privée (JWT_CLE_PRIVEE[_FICHIER])
-│   │   ├── ConnexionMongo.java          # MONGO_* ; à regrouper avec core plus tard
 │   │   ├── DepotUtilisateurs.java       # collection utilisateurs, index unique email
 │   │   ├── ServiceAuthentification.java # inscription, connexion
 │   │   ├── CompteExploitantDemo.java    # compte de démo au démarrage
@@ -134,6 +180,8 @@ middleware/
         │   ├── ApiApplication.java      # JAX-RS sous /api, @LoginConfig MP-JWT
         │   ├── sante/SanteResource.java
         │   ├── auth/AuthResource.java   # /api/auth/inscription, connexion, moi
+        │   ├── config/                  # /api/config/polygones : ressource, validation, conversion
+        │   ├── CorpsJson.java           # lecture du corps JSON (400 requete_invalide)
         │   └── erreurs/                 # format {erreur, message} pour toutes les erreurs
         ├── resources/META-INF/microprofile-config.properties   # émetteur et clé publique
         └── webapp/WEB-INF/web.xml       # @RolesAllowed actif, page d'erreur 401 en JSON
