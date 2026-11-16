@@ -22,7 +22,8 @@ seuls de petits messages texte (état des places, événements) quittent le Pi.
 | S1 | Structure du dossier, contrats MQTT et polygones, test YOLO pré-entraîné, photo prise par le Pi | **fait** |
 | S2 | Annotation du dataset, **lot 1** (sans maquette : datasets publics et photos de test, voir [Dataset — lot 1](#dataset--lot-1)) | **fait** |
 | S2 | Maquette (avec l'équipe) | **pas encore construite** |
-| S3 | Annotation des lots 2 et 3 à partir des photos de la maquette (mêmes scripts) | à faire |
+| S3 | Lot 1 rangé dans le dossier Google Drive de l'équipe ([Récupérer le lot 1](#récupérer-le-lot-1)) | **fait** |
+| S3 | Annotation des lots 2 et 3 (matériel de la maquette toujours absent : solution à décider en équipe) | à faire |
 | S4 | Fine-tuning YOLO11n sur les 3 lots, export NCNN, optimisation sur le Pi | à faire |
 | S4–S5 | Calcul d'occupation, lissage, anomalies | à faire |
 | S4–S5 | Client MQTT (TLS, file locale hors ligne) | à faire |
@@ -104,8 +105,7 @@ iot/
 ├── test_yolo.py          # S1 : test du modèle pré-entraîné
 ├── capture.py            # S1 : prise de photo (module caméra ou webcam)
 ├── test_capture.py       # S1 : tests de capture.py
-├── .env.exemple          # S2 : modèle de iot/.env (clé API Roboflow) — iot/.env n'est jamais commité
-├── annotation/           # S2 : scripts du dataset (pré-annotation, préparation, vérification, Label Studio)
+├── annotation/           # S2 : scripts du dataset (pré-annotation, Label Studio, préparation, vérification)
 ├── dataset/              # S2 : lots au format YOLO — NON versionné, sauf data.yaml.exemple
 ├── detecteur.py          # caméra + YOLO              (à venir)
 ├── occupation.py         # polygones, lissage, anomalies (à venir)
@@ -136,7 +136,7 @@ Test sur 21 images de voitures miniatures vues du dessus (seuil de confiance 0,2
 
 ## Dataset — lot 1
 
-Sprint 2. Le dataset sert à **fine-tuner YOLO11n** au sprint 4 : une seule classe, `voiture` (identifiant 0), au format YOLO. Scripts et procédure détaillée, reproductible avec sa propre clé API : [`annotation/README.md`](annotation/README.md).
+Sprint 2. Le dataset sert à **fine-tuner YOLO11n** au sprint 4 : une seule classe, `voiture` (identifiant 0), au format YOLO. Le lot 1 est rangé dans le dossier Google Drive de l'équipe ([Récupérer le lot 1](#récupérer-le-lot-1)) ; scripts et procédure des lots suivants : [`annotation/README.md`](annotation/README.md).
 
 > **La maquette n'est pas encore construite.** Le lot 1 se compose donc de datasets publics et de nos photos de test. La chaîne de travail est celle prévue pour la maquette (pré-annotation YOLO-World, correction humaine dans Label Studio, export YOLO, vérification) : seule la source des images changera.
 
@@ -152,7 +152,7 @@ Sprint 2. Le dataset sert à **fine-tuner YOLO11n** au sprint 4 : une seule clas
 \* Taille de la boîte si l'image est ramenée à 640 × 640 : petite < 32 × 32 px, moyenne < 96 × 96 px, grande au-delà.
 
 **Points de vigilance :**
-- **Vues de toy-car-detection** (73 images classées une par une, détail dans `annotation/vues_toycar.csv`) : **21 vues du dessus**, **22 vues en plongée** (de biais, d'en haut) et **30 vues de côté ou de face**. Notre caméra regarde du dessus : ce dataset sert surtout à la variété (couleurs, formes de voitures miniatures).
+- **Vues de toy-car-detection** (73 images classées une par une) : **21 vues du dessus**, **22 vues en plongée** (de biais, d'en haut) et **30 vues de côté ou de face**. Notre caméra regarde du dessus : ce dataset sert surtout à la variété (couleurs, formes de voitures miniatures).
 - **Échelle** : CARPK montre beaucoup de petites voitures réelles, toy-car une grande voiture par image. Sur la maquette, les voitures seront de taille moyenne : **les photos de la maquette (lots 2 et 3) restent indispensables**.
 - **Nettoyage de toy-car-detection** :
   - export augmenté × 3 : une seule variante gardée par image d'origine ;
@@ -160,8 +160,8 @@ Sprint 2. Le dataset sert à **fine-tuner YOLO11n** au sprint 4 : une seule clas
   - classe `objects` supprimée (elle doublait une voiture déjà annotée, recouvrement de 99 %) ;
   - 5 boîtes en double fusionnées ;
   - 31 images sans voiture ignorées (pièces, écrans, visage d'une personne) ;
-  - 3 images exclues (`annotation/exclusions_toycar.txt`) ;
-  - 1 oubli corrigé : la camionnette rouge de `toy-car-21` (`annotation/corrections/`).
+  - 3 images exclues : 2 captures d'écran avec des boîtes déjà dessinées, 1 photo avec un visage ;
+  - 1 oubli corrigé à la main : la camionnette rouge de `toy-car-21`.
 - **Photos de test** : les 4 fichiers AVIF de `photos_test/` ne sont pas lisibles par OpenCV et ont été ignorés (21 photos sur 25).
 
 ### Sources, licences et citations
@@ -172,7 +172,7 @@ Sprint 2. Le dataset sert à **fine-tuner YOLO11n** au sprint 4 : une seule clas
 | **CARPK** et **PUCPR+** (Hsieh et al., ICCV 2017), via le projet Roboflow « CARPK 2 » (`anis-elahi`) | Réservé à la recherche | **Usage académique uniquement**, selon les auteurs (https://lafi.github.io/LPN/). Une partie des images PUCPR+ vient de PKLot ; les droits restent à leurs propriétaires. La mention CC BY 4.0 affichée sur Roboflow vient de la personne qui a déposé le dataset, pas des auteurs. Le fork Roboflow utilisé pour le téléchargement a été supprimé. |
 | **Photos de test** (`iot/photos_test/`) | Droits d'auteur (images trouvées sur Internet, dont certaines avec filigrane) | Usage personnel de test uniquement ; jamais publiées, jamais envoyées sur Roboflow |
 
-**Images jamais versionnées** : aucune image ni aucun label de `iot/dataset/` n'est dans Git (voir `.gitignore`). Seuls sont versionnés les scripts, `data.yaml.exemple`, la liste des exclusions, le classement des vues et les corrections manuelles (texte).
+**Images jamais versionnées** : aucune image ni aucun label de `iot/dataset/` n'est dans Git (voir `.gitignore`). Seuls sont versionnés les scripts et `data.yaml.exemple` ; les lots sont dans le dossier Google Drive de l'équipe.
 
 Citations :
 
@@ -197,32 +197,25 @@ Citations :
 }
 ```
 
-### Reproduire le lot 1
+### Récupérer le lot 1
 
-Détail, résultats attendus et démarche du fork CARPK : [`annotation/README.md`](annotation/README.md). En résumé (depuis la racine du dépôt, avec sa clé dans `iot/.env`, voir `iot/.env.exemple`) :
+Le lot 1 n'est plus reconstruit : il est rangé, vérifié, dans le dossier Google Drive de l'équipe **« Smart Parking - Dataset IoT »** (accès réservé à l'équipe). Télécharger l'archive du lot 1, l'extraire dans `iot/dataset/`, puis vérifier (depuis la racine du dépôt) :
 
 ```
-python iot/annotation/telecharger_roboflow.py --projet parkitnowprototype/toy-car-detection-f5tno --version 4 --sortie iot/dataset/sources/toycar_v4
-python iot/annotation/telecharger_roboflow.py --projet <votre-workspace>/carpk-2-xxxxx --version 1 --sortie iot/dataset/sources/carpk_v1
-python iot/annotation/preparer_datasets.py --source iot/dataset/sources/toycar_v4 --nom toycar --classes-a-garder toycar --une-variante-par-origine --ignorer-vides --exclusions iot/annotation/exclusions_toycar.txt --corrections iot/annotation/corrections
-python iot/annotation/preparer_datasets.py --source iot/dataset/sources/carpk_v1 --nom carpk --echantillon 80
-python iot/annotation/pre_annoter.py --entree iot/photos_test --sortie iot/dataset/pre_annotations/photos --format label-studio
-#   -> correction dans Label Studio, export JSON (annotation/README.md, section 5)
-python iot/annotation/label_studio.py depuis-ls --export iot/dataset/exports/photos.label-studio.json --sortie iot/dataset/corrections/photos
-python iot/annotation/preparer_datasets.py --source iot/dataset/corrections/photos --nom photos --seuil-doublons 0
-python iot/annotation/verifier_dataset.py --apercu 12
+python iot/annotation/verifier_dataset.py --dossier iot/dataset/lot1 --apercu 12
 ```
+
+Résultat attendu : `TOTAL 174 images, 5212 voitures`, puis `Aucune erreur : le lot est prêt.` Règles du dossier partagé : [`annotation/README.md`, section 2](annotation/README.md#2-dossier-partagé-du-dataset-google-drive).
 
 Emplacement, **non versionné** :
 
 ```
 iot/dataset/
 ├── data.yaml.exemple        # seul fichier versionné : modèle de configuration YOLO (copié en data.yaml au sprint 4)
-├── sources/                 # téléchargements Roboflow (toycar_v4/, carpk_v1/)
-├── pre_annotations/photos/  # sortie de pre_annoter.py + fichier d'import Label Studio
-├── exports/                 # exports JSON de Label Studio
-├── corrections/photos/      # photos corrigées, au format YOLO
 ├── lot1/                    # LE LOT 1 : images/ + labels/ (toycar_*, carpk_*, photos_*)
+├── pre_annotations/         # sortie de pre_annoter.py + fichier d'import Label Studio (lots suivants)
+├── exports/                 # exports JSON de Label Studio
+├── corrections/             # images corrigées, au format YOLO
 └── apercu/                  # images de contrôle avec les boîtes dessinées
 ```
 
@@ -237,7 +230,7 @@ iot/dataset/
    ```
    python iot/annotation/pre_annoter.py --entree iot/dataset/maquette/brut --sortie iot/dataset/pre_annotations/maquette --format label-studio
    ```
-3. **Corriger** dans Label Studio : nouveau projet, stockage *Local files* sur `…\iot\dataset\pre_annotations\maquette\images`, import du JSON, puis export JSON (`annotation/README.md`, section 5).
+3. **Corriger** dans Label Studio : nouveau projet, stockage *Local files* sur `…\iot\dataset\pre_annotations\maquette\images`, import du JSON, puis export JSON (`annotation/README.md`, section 3).
 4. **Ajouter** au lot 2 :
    ```
    python iot/annotation/label_studio.py depuis-ls --export iot/dataset/exports/maquette.label-studio.json --sortie iot/dataset/corrections/maquette

@@ -6,4 +6,4 @@ paho-mqtt>=2.0        # client MQTT (TLS)
 pyyaml                # lecture des data.yaml (annotation/preparer_datasets.py)
 
 # Label Studio (correction des annotations) n'est PAS listé ici : il s'installe dans un
-# environnement Python séparé, pour ne pas casser ultralytics (voir annotation/README.md, section 5.1).
+# environnement Python séparé, pour ne pas casser ultralytics (voir annotation/README.md, section 3.1).
