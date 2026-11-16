@@ -5,9 +5,7 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
-import jakarta.json.JsonException;
 import jakarta.json.JsonObject;
-import jakarta.json.JsonReader;
 import jakarta.json.JsonString;
 import jakarta.json.JsonValue;
 import jakarta.ws.rs.Consumes;
@@ -17,8 +15,8 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.io.StringReader;
 import org.eclipse.microprofile.jwt.JsonWebToken;
+import tn.supcom.smartparking.CorpsJson;
 import tn.supcom.smartparking.iam.EmetteurJwt;
 import tn.supcom.smartparking.iam.ErreurIam;
 import tn.supcom.smartparking.iam.ServiceAuthentification;
@@ -45,7 +43,7 @@ public class AuthResource {
     @PermitAll
     @Consumes(MediaType.APPLICATION_JSON)
     public Response inscription(String corps) {
-        JsonObject o = lireObjet(corps);
+        JsonObject o = CorpsJson.lireObjet(corps);
         // Un champ « role » éventuellement envoyé est ignoré : l'inscription crée toujours un CONDUCTEUR.
         Utilisateur u = service.inscrire(texte(o, "nom"), texte(o, "email"), texte(o, "mot_de_passe"));
         return Response.status(Response.Status.CREATED)
@@ -65,7 +63,7 @@ public class AuthResource {
     @PermitAll
     @Consumes(MediaType.APPLICATION_JSON)
     public Response connexion(String corps) {
-        JsonObject o = lireObjet(corps);
+        JsonObject o = CorpsJson.lireObjet(corps);
         Utilisateur u = service.connecter(texte(o, "email"), texte(o, "mot_de_passe"));
         return Response.ok(Json.createObjectBuilder()
                         .add("jeton", emetteur.emettre(u))
@@ -103,21 +101,6 @@ public class AuthResource {
                 // Collection « autorisations » prévue au sprint 6 : liste vide pour l'instant.
                 .add("autorisations", Json.createArrayBuilder())
                 .build();
-    }
-
-    private static JsonObject lireObjet(String corps) {
-        if (corps == null || corps.isBlank()) {
-            throw ErreurIam.requeteInvalide("Le corps de la requête est vide.");
-        }
-        try (JsonReader lecteur = Json.createReader(new StringReader(corps))) {
-            JsonValue v = lecteur.readValue();
-            if (v.getValueType() != JsonValue.ValueType.OBJECT) {
-                throw ErreurIam.requeteInvalide("Le corps doit être un objet JSON.");
-            }
-            return v.asJsonObject();
-        } catch (JsonException e) {
-            throw ErreurIam.requeteInvalide("JSON mal formé.");
-        }
     }
 
     /** Valeur texte d'un champ, null s'il est absent ; 400 s'il n'est pas un texte. */
