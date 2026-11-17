@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fausse-api",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["frontend/outils/fausse_api.py", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

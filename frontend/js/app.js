@@ -16,6 +16,16 @@ window.addEventListener('offline', majReseau);
 majReseau();
 
 if ('serviceWorker' in navigator) {
+  // Une mise à jour active un nouveau service worker (skipWaiting + clients.claim côté
+  // service-worker.js), mais la page déjà ouverte continue de servir les ressources de
+  // l'ancien tant qu'elle n'est pas rechargée : on le fait une seule fois ici.
+  let actualisationEnCours = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (actualisationEnCours) return;
+    actualisationEnCours = true;
+    window.location.reload();
+  });
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js').catch((erreur) => {
       console.error('Service worker non enregistré :', erreur);
