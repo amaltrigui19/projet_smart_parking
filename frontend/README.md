@@ -2,20 +2,29 @@
 
 Application web progressive unique (HTML, CSS, JavaScript, modules ES, sans build). Elle accueillera deux interfaces selon le rôle du JWT : **conducteur** (front-office) et **exploitant** (back-office).
 
-## État (sprint 1)
+## État (sprint 3)
 
-Base installable : coquille, manifeste, service worker, page hors ligne. Les interfaces conducteur et exploitant arrivent dans les sprints suivants.
+- Sprint 1 : base installable (coquille, manifeste, service worker, page hors ligne).
+- Sprint 2-3 : outil de calibration des places (voir plus bas).
+- Sprint 3 : **connexion et inscription**, jeton JWT, redirection selon le rôle, déconnexion (voir « Connexion »).
 
 ## Structure
 
 ```
 frontend/
 ├── index.html            # coquille et page d'accueil
+├── connexion.html        # connexion et inscription
+├── conducteur.html       # front-office (rôle CONDUCTEUR)
+├── exploitant.html       # back-office (rôle EXPLOITANT)
 ├── offline.html          # page de repli hors ligne
 ├── manifest.json         # nom, icônes, couleurs, display: standalone
 ├── service-worker.js     # cache de la coquille (CACHE_VERSION à incrémenter)
 ├── css/style.css
 ├── js/app.js             # enregistrement du service worker, installation, état du réseau
+├── js/auth.js            # session : jeton JWT, rôle, appels à l'API, déconnexion
+├── js/connexion.js       # formulaires de connexion et d'inscription
+├── js/espace.js          # pages réservées : contrôle du rôle, nom, déconnexion
+├── js/accueil.js         # accueil : lien vers son espace si déjà connecté
 └── icons/                # icônes 192, 512, maskable + generer_icones.py
 ```
 
@@ -46,6 +55,44 @@ Les appels à l'API (`/api/...`) ne sont jamais mis en cache.
 pip install pillow
 python icons/generer_icones.py
 ```
+## Connexion (`connexion.html`)
+
+Contrat : `docs/contrats.md` §1.2 et §2.5. Les routes serveur sont celles de `middleware/` (`/api/auth/...`).
+
+- **Connexion** : `POST /api/auth/connexion`. En cas de succès, le jeton est rangé dans **`sessionStorage`, clé `jwt`** (lu aussi par la calibration), avec l'utilisateur et l'heure d'expiration.
+- **Inscription** : `POST /api/auth/inscription` (toujours un conducteur), puis connexion automatique.
+- **Redirection selon le rôle** (`utilisateur.role` de la réponse de connexion) : `CONDUCTEUR` → `conducteur.html`, `EXPLOITANT` → `exploitant.html`. Un conducteur qui ouvre `exploitant.html` est renvoyé vers son espace. La vraie protection reste le serveur.
+- **Déconnexion** : bouton « Se déconnecter », qui efface la session.
+- **Session expirée** : sur un `401` d'une route protégée (`appelerApi` de `js/auth.js`), la session est effacée et on revient à `connexion.html?expire`.
+- Aucun en-tête `Authorization` n'est envoyé sur l'inscription et la connexion : le serveur refuse en `401` tout jeton invalide, même sur une route publique.
+- Erreurs : le champ `message` du serveur est affiché (« Email ou mot de passe incorrect. » pour un `401`).
+
+Pour une nouvelle page réservée : `<body data-role="EXPLOITANT" hidden>` et `<script type="module" src="js/espace.js">`. Les appels à l'API passent par `appelerApi()` de `js/auth.js`.
+
+### Tester avec la fausse API
+
+`outils/fausse_api.py` implémente aussi `POST /api/auth/inscription`, `POST /api/auth/connexion` et `GET /api/auth/moi`. Les comptes sont en mémoire et deux comptes de test existent au démarrage :
+
+| Email | Mot de passe | Rôle |
+|---|---|---|
+| `exploitant@exemple.tn` | `exploitant123` | EXPLOITANT |
+| `conducteur@exemple.tn` | `conducteur123` | CONDUCTEUR |
+
+Le jeton renvoyé a la forme d'un JWT mais **n'est pas signé** : outil de test uniquement.
+
+```bash
+python frontend/outils/fausse_api.py     # puis ouvrir http://localhost:8000/connexion.html
+```
+
+1. Mauvais mot de passe → « Email ou mot de passe incorrect. ».
+2. Compte exploitant → `exploitant.html`. La carte « Calibration des places » ouvre la calibration, déjà connectée.
+3. Ouvrir `conducteur.html` en étant exploitant → retour vers `exploitant.html`.
+4. « Se déconnecter » → `connexion.html`, `sessionStorage` vide.
+5. « Créer un compte » → `conducteur.html`. Le même email une seconde fois → « Un compte existe déjà… ».
+6. Console : `sessionStorage.setItem("jwt", "bidon")`, puis ouvrir `conducteur.html` → retour vers la connexion avec « Votre session a expiré ».
+
+Avec le vrai serveur (PR serveur JWT) : même parcours sur https://localhost/connexion.html, avec le compte de `EXPLOITANT_EMAIL` de `server/.env`.
+
 ## Calibration des places (`calibration.html`)
 
 Page de l'exploitant pour indiquer au Pi où se trouvent les places sur l'image de la caméra. On dessine chaque place et chaque zone interdite sur la photo de référence. La page **enregistre** le fichier `places.json` sur le serveur (`PUT /api/config/polygones`, contrat §2.10), au format du contrat des polygones (§5.2). Elle peut aussi l'exporter.
@@ -77,9 +124,9 @@ Ouverte par un double-clic (`file://`), la page sert seulement à dessiner et à
 
 ### Jeton JWT
 
-L'API exige un jeton d'**exploitant** : `Authorization: Bearer <jwt>` (contrat §1.2). La page le lit dans **`sessionStorage`, clé `jwt`**, que la page de connexion remplira (sprint 3). L'emplacement est défini à un seul endroit, en haut de `js/calibration.js` (`STOCKAGE_JWT` et `CLE_JWT`).
+L'API exige un jeton d'**exploitant** : `Authorization: Bearer <jwt>` (contrat §1.2). La page le lit dans **`sessionStorage`, clé `jwt`**, remplie par la page de connexion (`connexion.html`, compte exploitant). L'emplacement est défini à un seul endroit, en haut de `js/calibration.js` (`STOCKAGE_JWT` et `CLE_JWT`).
 
-En attendant la page de connexion, on place un jeton à la main. Dans la console du navigateur (F12 → Console), sur la page de calibration :
+On peut aussi placer un jeton à la main. Dans la console du navigateur (F12 → Console), sur la page de calibration :
 
 ```js
 sessionStorage.setItem("jwt", "exploitant")   // jeton de test accepté par la fausse API
@@ -130,7 +177,7 @@ Tests automatiques :
 
 ```bash
 node frontend/outils/test_validation.js                     # 13 tests de la validation côté client
-python -m unittest frontend/outils/test_fausse_api.py -v    # 8 tests de la fausse API (200, 400, 401, 403, 404)
+python -m unittest frontend/outils/test_fausse_api.py -v    # 14 tests de la fausse API (polygones et authentification)
 ```
 
 ### Avec le vrai serveur (quand la route existera)

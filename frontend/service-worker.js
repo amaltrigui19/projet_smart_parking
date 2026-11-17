@@ -1,14 +1,21 @@
 // Incrémenter CACHE_VERSION à chaque changement de la coquille pour renouveler le cache.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE = `smart-parking-${CACHE_VERSION}`;
 
 const COQUILLE = [
   './',
   'index.html',
+  'connexion.html',
+  'conducteur.html',
+  'exploitant.html',
   'offline.html',
   'manifest.json',
   'css/style.css',
   'js/app.js',
+  'js/auth.js',
+  'js/accueil.js',
+  'js/connexion.js',
+  'js/espace.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',
