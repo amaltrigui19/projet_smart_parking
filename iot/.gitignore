@@ -2,6 +2,8 @@
 runs/
 resultats/
 *.pt
+# Sauf les modèles entraînés du projet (sprint 4 : iot/models/yolo_v1.pt)
+!models/*.pt
 
 # Photos de test (droits d'auteur)
 photos_test/
