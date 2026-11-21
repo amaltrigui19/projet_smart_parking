@@ -15,7 +15,7 @@
     <name>Smart Parking - IAM (identité et accès)</name>
 
     <dependencies>
-        <!-- Connexion MongoDB partagée (core/donnees/ConnexionMongo) : une seule connexion pour tous les DAO -->
+        <!-- Shared MongoDB connection (core/persistence/MongoConnection). To be removed when IAM becomes standalone. -->
         <dependency>
             <groupId>tn.supcom.smartparking</groupId>
             <artifactId>core</artifactId>

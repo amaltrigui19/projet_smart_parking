@@ -13,7 +13,7 @@ import java.util.Date;
 import java.util.Optional;
 import org.bson.Document;
 import org.bson.types.ObjectId;
-import tn.supcom.smartparking.core.donnees.ConnexionMongo;
+import tn.supcom.smartparking.core.persistence.MongoConnection;
 
 /**
  * Accès à la collection {@code utilisateurs} (contrat §2.14) :
@@ -25,12 +25,12 @@ public class DepotUtilisateurs {
     static final String COLLECTION = "utilisateurs";
 
     @Inject
-    ConnexionMongo connexion;
+    MongoConnection connexion;
 
     private volatile boolean indexCree;
 
     private MongoCollection<Document> collection() {
-        MongoCollection<Document> c = connexion.base().getCollection(COLLECTION);
+        MongoCollection<Document> c = connexion.database().getCollection(COLLECTION);
         if (!indexCree) {
             // Sans effet si l'index existe déjà. C'est lui qui garantit « un email = un compte ».
             c.createIndex(Indexes.ascending("email"), new IndexOptions().unique(true).name("email_unique"));
