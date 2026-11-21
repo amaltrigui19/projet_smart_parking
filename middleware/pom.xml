@@ -32,6 +32,14 @@
             <version>11.0.0</version>
             <scope>provided</scope>
         </dependency>
+        <!-- MicroProfile Config: settings injected with @ConfigProperty instead of hard-coded values.
+             Provided by WildFly at runtime. -->
+        <dependency>
+            <groupId>org.eclipse.microprofile.config</groupId>
+            <artifactId>microprofile-config-api</artifactId>
+            <version>3.1</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>

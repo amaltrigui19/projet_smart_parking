@@ -16,7 +16,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.jwt.JsonWebToken;
-import tn.supcom.smartparking.CorpsJson;
+import tn.supcom.smartparking.JsonBody;
 import tn.supcom.smartparking.iam.EmetteurJwt;
 import tn.supcom.smartparking.iam.ErreurIam;
 import tn.supcom.smartparking.iam.ServiceAuthentification;
@@ -43,7 +43,7 @@ public class AuthResource {
     @PermitAll
     @Consumes(MediaType.APPLICATION_JSON)
     public Response inscription(String corps) {
-        JsonObject o = CorpsJson.lireObjet(corps);
+        JsonObject o = JsonBody.readObject(corps);
         // Un champ « role » éventuellement envoyé est ignoré : l'inscription crée toujours un CONDUCTEUR.
         Utilisateur u = service.inscrire(texte(o, "nom"), texte(o, "email"), texte(o, "mot_de_passe"));
         return Response.status(Response.Status.CREATED)
@@ -63,7 +63,7 @@ public class AuthResource {
     @PermitAll
     @Consumes(MediaType.APPLICATION_JSON)
     public Response connexion(String corps) {
-        JsonObject o = CorpsJson.lireObjet(corps);
+        JsonObject o = JsonBody.readObject(corps);
         Utilisateur u = service.connecter(texte(o, "email"), texte(o, "mot_de_passe"));
         return Response.ok(Json.createObjectBuilder()
                         .add("jeton", emetteur.emettre(u))

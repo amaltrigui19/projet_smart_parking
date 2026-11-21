@@ -14,6 +14,6 @@
          on renvoie quand même le format d'erreur du contrat (§2.1), au lieu de la page HTML de WildFly. -->
     <error-page>
         <error-code>401</error-code>
-        <location>/erreurs/401</location>
+        <location>/errors/401</location>
     </error-page>
 </web-app>
