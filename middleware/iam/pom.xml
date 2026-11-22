@@ -15,17 +15,31 @@
     <name>Smart Parking - IAM (identité et accès)</name>
 
     <dependencies>
-        <!-- Connexion MongoDB partagée (core/donnees/ConnexionMongo) : une seule connexion pour tous les DAO -->
+        <!-- TEMPORAIRE : connexion MongoDB de core, retirée quand l'IAM aura la sienne (refonte, étape d) -->
         <dependency>
             <groupId>tn.supcom.smartparking</groupId>
             <artifactId>core</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Driver officiel MongoDB (synchrone), même version que core. Embarqué dans api.war. -->
+        <!-- Driver officiel MongoDB (synchrone). Embarqué dans api.war. -->
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
             <version>5.14.0</version>
+        </dependency>
+        <!-- JWT et JWK (RS256, kid, JWKS) : bibliothèque reconnue, en Java pur -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>10.0.2</version>
+        </dependency>
+
+        <!-- MicroProfile Config (@ConfigProperty), fourni par WildFly à l'exécution -->
+        <dependency>
+            <groupId>org.eclipse.microprofile.config</groupId>
+            <artifactId>microprofile-config-api</artifactId>
+            <version>3.1</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Tests unitaires -->
@@ -33,6 +47,12 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.11.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>5.14.2</version>
             <scope>test</scope>
         </dependency>
         <!-- Implémentation de JSON-P pour les tests (WildFly fournit la sienne à l'exécution) -->
