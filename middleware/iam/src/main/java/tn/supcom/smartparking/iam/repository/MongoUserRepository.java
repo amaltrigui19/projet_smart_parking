@@ -14,7 +14,6 @@ import java.util.Date;
 import java.util.Optional;
 import org.bson.Document;
 import org.bson.types.ObjectId;
-import tn.supcom.smartparking.core.donnees.ConnexionMongo;
 import tn.supcom.smartparking.iam.exceptions.IamException;
 import tn.supcom.smartparking.iam.model.Role;
 import tn.supcom.smartparking.iam.model.User;
@@ -29,12 +28,12 @@ public class MongoUserRepository implements UserRepository {
     static final String COLLECTION = "users";
 
     @Inject
-    ConnexionMongo connection;
+    IamMongoConnection connection;
 
     private volatile boolean indexCreated;
 
     MongoCollection<Document> collection() {
-        MongoCollection<Document> c = connection.base().getCollection(COLLECTION);
+        MongoCollection<Document> c = connection.database().getCollection(COLLECTION);
         if (!indexCreated) {
             // Sans effet si l'index existe déjà.
             c.createIndex(Indexes.ascending("email"), new IndexOptions().unique(true).name("email_unique"));

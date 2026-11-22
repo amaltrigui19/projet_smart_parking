@@ -15,13 +15,8 @@
     <name>Smart Parking - IAM (identité et accès)</name>
 
     <dependencies>
-        <!-- TEMPORAIRE : connexion MongoDB de core, retirée quand l'IAM aura la sienne (refonte, étape d) -->
-        <dependency>
-            <groupId>tn.supcom.smartparking</groupId>
-            <artifactId>core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!-- Driver officiel MongoDB (synchrone). Embarqué dans api.war. -->
+        <!-- Module autonome : aucune dépendance vers core ni api (connexion MongoDB propre : IamMongoConnection).
+             Driver officiel MongoDB (synchrone), embarqué dans api.war. -->
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
