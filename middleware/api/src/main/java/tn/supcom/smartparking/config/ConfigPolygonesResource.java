@@ -16,7 +16,7 @@ import tn.supcom.smartparking.core.donnees.DepotParkings;
 import tn.supcom.smartparking.core.donnees.DepotPlaces;
 import tn.supcom.smartparking.core.modele.Parking;
 import tn.supcom.smartparking.core.modele.Place;
-import tn.supcom.smartparking.iam.ErreurIam;
+import tn.supcom.smartparking.erreurs.ErreurApi;
 
 /**
  * GET et PUT /api/config/polygones (contrat §2.10) : le fichier places.json (§5.2) de la calibration.
@@ -54,7 +54,7 @@ public class ConfigPolygonesResource {
         JsonObject fichier = CorpsJson.lireObjet(corps);
         List<String> erreurs = ValidationPolygones.valider(fichier);
         if (!erreurs.isEmpty()) {
-            throw new ErreurIam(400, "config_invalide", String.join(ValidationPolygones.SEPARATEUR, erreurs));
+            throw new ErreurApi(400, "config_invalide", String.join(ValidationPolygones.SEPARATEUR, erreurs));
         }
         Parking existant = depotParkings.parId(ValidationPolygones.PARKING)
                 .orElseThrow(() -> introuvable("Le parking P1 n'existe pas encore : lancer les données d'exemple "
@@ -65,7 +65,7 @@ public class ConfigPolygonesResource {
         return lire();
     }
 
-    private static ErreurIam introuvable(String message) {
-        return new ErreurIam(404, "introuvable", message);
+    private static ErreurApi introuvable(String message) {
+        return new ErreurApi(404, "introuvable", message);
     }
 }
