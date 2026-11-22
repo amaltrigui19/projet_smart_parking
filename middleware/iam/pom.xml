@@ -34,6 +34,14 @@
             <version>10.0.2</version>
         </dependency>
 
+        <!-- Argon2id (hachage des mots de passe) : Bouncy Castle, en Java pur (pas de bibliothèque native dans Docker).
+             Seule l'API « légère » (Argon2BytesGenerator) est utilisée : aucun fournisseur JCA à enregistrer. -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
+
         <!-- MicroProfile Config (@ConfigProperty), fourni par WildFly à l'exécution -->
         <dependency>
             <groupId>org.eclipse.microprofile.config</groupId>
