@@ -2,11 +2,12 @@
 
 Application web progressive unique (HTML, CSS, JavaScript, modules ES, sans build). Elle accueillera deux interfaces selon le rôle du JWT : **conducteur** (front-office) et **exploitant** (back-office).
 
-## État (sprint 3)
+## État (sprint 4)
 
 - Sprint 1 : base installable (coquille, manifeste, service worker, page hors ligne).
 - Sprint 2-3 : outil de calibration des places (voir plus bas).
 - Sprint 3 : **connexion et inscription**, jeton JWT, redirection selon le rôle, déconnexion (voir « Connexion »).
+- Sprint 4 : **plan en temps réel** par WebSocket, testé avec un faux serveur (voir « Plan en temps réel »).
 
 ## Structure
 
@@ -25,6 +26,8 @@ frontend/
 ├── js/connexion.js       # formulaires de connexion et d'inscription
 ├── js/espace.js          # pages réservées : contrôle du rôle, nom, déconnexion
 ├── js/accueil.js         # accueil : lien vers son espace si déjà connecté
+├── js/temps-reel.js      # état des places en temps réel (GET /api/places + WebSocket), sans dessin
+├── plan-temps-reel.html  # démo provisoire du plan en temps réel (+ js/plan-temps-reel.js, css/plan.css)
 └── icons/                # icônes 192, 512, maskable + generer_icones.py
 ```
 
@@ -210,3 +213,80 @@ Attendu : `[OK] ... Fichier conforme au contrat.` En cas d'erreur, le script ind
 - Le plan (A1 à B4) est écrit dans `js/calibration.js` et dans les outils. Plus tard, il viendra de `GET /api/config/plan`.
 - On ne peut pas déplacer un coin à la souris : **Modifier**, puis « Modifier le tracé » (retirer les derniers points et les replacer), ou redessiner.
 - Ne pas versionner `places.json`, ni les photos de test.
+
+## Plan en temps réel (sprint 4)
+
+Contrat : `docs/contrats.md` §1.4 (WebSocket) et §2.6 (`GET /api/places`). Le plan change de couleur dès que le serveur envoie un changement, sans recharger la page.
+
+| Fichier | Rôle |
+|---|---|
+| `js/temps-reel.js` | **Module réutilisable**, sans dessin : état complet, WebSocket, reconnexion, indicateur, 401 |
+| `plan-temps-reel.html`, `js/plan-temps-reel.js`, `css/plan.css` | Page de démo avec un plan SVG **provisoire**, à remplacer par celui d'Amal |
+| `outils/faux_websocket.py` | Faux serveur : la fausse API, plus `GET /api/places` et le WebSocket `/api/ws/places` |
+| `outils/test_temps_reel.mjs`, `outils/test_faux_websocket.py` | Tests automatiques |
+
+### Fonctionnement de `js/temps-reel.js`
+
+1. Il ouvre `ws(s)://<hôte>/api/ws/places?token=<jwt>` (jeton lu dans `sessionStorage["jwt"]`, §1.2).
+2. Dès que le WebSocket est ouvert, il charge l'**état complet** (`GET /api/places`), puis applique les messages `{ "place": "A3", "etat": "occupee", "depuis": "…Z" }`. Les messages reçus pendant ce chargement sont gardés, puis appliqués, sauf ceux plus anciens que l'état chargé : aucun changement n'est perdu.
+3. Si le WebSocket se coupe, il se **reconnecte tout seul** après 1 s, 2 s, 5 s, puis toutes les 10 s, et **recharge l'état complet** à chaque reconnexion. Au retour du réseau (événement `online`), il réessaie tout de suite.
+4. **Indicateur** : `connexion`, `connecte`, `reconnexion` (le serveur répond, mais pas le WebSocket) et `hors-ligne` (réseau coupé ou serveur injoignable). Sur la page de démo, le plan est grisé tant qu'il n'est pas à jour.
+5. **401** : jeton absent ou expiré, `GET /api/places` en `401`, ou WebSocket fermé par le serveur avec le code `4401` (ou `1008`). Dans ces trois cas, la session est effacée et la page revient à `connexion.html?expire`. Un navigateur ne donne pas le code HTTP d'un WebSocket refusé : après un refus, le module interroge `GET /api/places` pour savoir si c'est un `401`.
+6. Un message avec un champ `type` (événements et statut du Pi pour l'exploitant, proposition du §2.6) n'est pas un changement de place : il est transmis à `surAutreMessage`.
+
+### Pour le plan SVG d'Amal : la convention
+
+- Chaque place du SVG porte **`data-place="<id>"`** (`A1`…`B4`, comme dans l'API), sur la forme ou sur un `<g>` qui la contient.
+- Le module met sur cet élément **une seule classe** parmi **`libre`**, **`occupee`** et **`reservee`** (sans accent, comme `etat` dans l'API), plus l'attribut `data-etat`.
+- Les couleurs sont dans `css/plan.css` (`[data-place].libre { fill: … }`). Sur un `<g>`, `fill` passe aux formes qu'il contient : les textes (numéros) doivent avoir leur propre `fill`.
+
+```js
+import { brancherPlan, afficherStatut } from './temps-reel.js';
+
+const tempsReel = brancherPlan(document.querySelector('#plan'), {
+  surStatut: afficherStatut(document.querySelector('#statut-temps-reel')), // pastille de connexion
+  surChangement(place, etat, info) { /* facultatif : infobulle, compteur… */ },
+  surEtatComplet(places) { /* facultatif : Map id -> { id, etat, depuis, type, duree_max_min } */ },
+});
+// tempsReel.places (Map), tempsReel.statut, tempsReel.arreter()
+```
+
+Sans DOM : `demarrerTempsReel({ surChangement(place, etat) { … } })`.
+
+### Tester avec le faux serveur
+
+`outils/faux_websocket.py` reprend toute la fausse API (connexion, polygones) et ajoute `GET /api/places` et le WebSocket. Il envoie un changement aléatoire toutes les 2 secondes, à tous les clients connectés. Il n'utilise que la bibliothèque standard de Python (WebSocket minimal : texte, ping, fermeture) : **aucune dépendance à installer**.
+
+| Jeton | `GET /api/places` et WebSocket |
+|---|---|
+| `exploitant`, `conducteur`, ou un jeton de la fausse connexion | accepté |
+| absent, illisible ou expiré | `401`, poignée de main refusée |
+
+```bash
+python frontend/outils/faux_websocket.py                  # depuis la racine ; --intervalle 1, --port 8001
+```
+
+1. Ouvrir http://localhost:8000/connexion.html et se connecter (`conducteur@exemple.tn` / `conducteur123`, ou le compte exploitant).
+2. Ouvrir http://localhost:8000/plan-temps-reel.html. Attendu : la pastille « Temps réel : connecté », puis une place qui change de couleur toutes les 2 s, le résumé et la liste « Derniers changements » mis à jour, **sans rechargement de la page**.
+3. Arrêter le serveur (Ctrl+C). Attendu : « Reconnexion dans 1 s… », puis « Hors ligne · nouvel essai dans … s », et le plan grisé.
+4. Relancer le serveur. Attendu : au plus 10 s plus tard, « Temps réel : connecté », « état complet chargé » dans la liste, et les changements qui reprennent, toujours sans recharger la page.
+5. Console : `sessionStorage.setItem("jwt", "a.b.c")`, puis arrêter et relancer le serveur. Attendu : retour vers `connexion.html` avec « Votre session a expiré ».
+
+DevTools > Network > WS : on voit la connexion `places?token=…` et les messages reçus.
+
+Tests automatiques :
+
+```bash
+node frontend/outils/test_temps_reel.mjs                       # 15 tests du module (faux WebSocket, fausse minuterie)
+python -m unittest frontend/outils/test_faux_websocket.py -v   # 6 tests du faux serveur (vrai WebSocket)
+```
+
+### Avec le vrai serveur
+
+La page est servie par Nginx sur le même domaine que l'API : https://localhost/plan-temps-reel.html en local, et `wss://` est choisi automatiquement en HTTPS. Nginx transmet déjà l'en-tête `Upgrade` sur `/api/ws/` (`server/nginx/nginx.conf`).
+
+### Limites actuelles
+
+- Le plan de `plan-temps-reel.html` est **provisoire** : il sera remplacé par le plan SVG d'Amal (généré à partir de `GET /api/parking`). Le module, lui, reste.
+- La page n'est pas encore reliée depuis `conducteur.html` et `exploitant.html` (pages d'Eya) : on l'ouvre par son adresse.
+- Les fichiers de cette page ne sont pas dans la coquille hors ligne du service worker : le temps réel n'a pas de sens hors ligne.
