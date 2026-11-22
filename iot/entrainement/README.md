@@ -32,6 +32,10 @@ La dernière cellule supprime la copie du dataset et les dossiers d'entraînemen
 
 ## 3. Ranger le modèle et l'évaluer
 
+**Modèle actuel : [`iot/models/yolo_v1.pt`](../models/yolo_v1.pt)**. Sa fiche (paramètres, métriques, courbes, limites) est dans [`iot/models/yolo_v1/README.md`](../models/yolo_v1/README.md).
+
+Pour un nouveau modèle :
+
 ```powershell
 New-Item -ItemType Directory -Force iot\models | Out-Null
 copy $HOME\Downloads\best.pt iot\models\yolo_v1.pt
