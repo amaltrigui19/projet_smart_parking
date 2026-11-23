@@ -2,9 +2,9 @@ package tn.supcom.smartparking.core.model;
 
 /** Kind of parking spot; {@link #value()} is the text stored in MongoDB and exchanged as JSON. */
 public enum SpotType {
-    STANDARD("normale"),
-    DISABLED("pmr"),
-    ELECTRIC("electrique");
+    STANDARD("standard"),
+    ACCESSIBLE("accessible"),
+    ELECTRIC("electric");
 
     private final String value;
 

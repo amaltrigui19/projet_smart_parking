@@ -22,11 +22,11 @@ class CalibrationMapperTest {
 
     private static final String FILE = """
         {"parking": "P1", "resolution": [800, 600],
-         "places": [
-           {"id": "B4", "type": "electrique", "duree_max_min": 60, "poly": [[340,280],[430,280],[430,420]]},
-           {"id": "A1", "type": "pmr", "duree_max_min": 120, "poly": [[40,60],[130,60],[130,200],[40,200]]}],
-         "zones_interdites": [{"id": "allee1", "poly": [[500,210],[639,210],[639,280],[500,280]]},
-                              {"id": "sortie", "poly": [[0,0],[10,0],[10,10]]}]}
+         "spots": [
+           {"id": "B4", "type": "electric", "max_duration_min": 60, "polygon": [[340,280],[430,280],[430,420]]},
+           {"id": "A1", "type": "accessible", "max_duration_min": 120, "polygon": [[40,60],[130,60],[130,200],[40,200]]}],
+         "forbidden_zones": [{"id": "allee1", "polygon": [[500,210],[639,210],[639,280],[500,280]]},
+                              {"id": "sortie", "polygon": [[0,0],[10,0],[10,10]]}]}
         """;
 
     private static final Parking EXISTING = new Parking("P1", "Maquette SUP'COM", 640, 480, 60, 40,
@@ -44,7 +44,7 @@ class CalibrationMapperTest {
         Spot a1 = spots.get(1);
         assertEquals("A1", a1.id());
         assertEquals("P1", a1.parkingId());
-        assertEquals(SpotType.DISABLED, a1.type());
+        assertEquals(SpotType.ACCESSIBLE, a1.type());
         assertEquals(120, a1.maxDurationMin());
         assertEquals(new Point(130, 200), a1.polygon().get(2));
         assertEquals(SpotState.FREE, a1.state()); // unused: replacePolygons keeps the stored state
@@ -71,11 +71,11 @@ class CalibrationMapperTest {
         JsonObject reread = CalibrationMapper.toFile(p, CalibrationMapper.spots(file(), "P1"));
         assertEquals("P1", reread.getString("parking"));
         assertEquals(800, reread.getJsonArray("resolution").getInt(0));
-        assertEquals("A1", reread.getJsonArray("places").getJsonObject(0).getString("id")); // sorted by id
-        assertEquals("pmr", reread.getJsonArray("places").getJsonObject(0).getString("type"));
-        assertEquals(List.of("id", "type", "duree_max_min", "poly"),
-                List.copyOf(reread.getJsonArray("places").getJsonObject(0).keySet()));
-        assertEquals(List.of("id", "poly"), List.copyOf(reread.getJsonArray("zones_interdites").getJsonObject(0).keySet()));
+        assertEquals("A1", reread.getJsonArray("spots").getJsonObject(0).getString("id")); // sorted by id
+        assertEquals("accessible", reread.getJsonArray("spots").getJsonObject(0).getString("type"));
+        assertEquals(List.of("id", "type", "max_duration_min", "polygon"),
+                List.copyOf(reread.getJsonArray("spots").getJsonObject(0).keySet()));
+        assertEquals(List.of("id", "polygon"), List.copyOf(reread.getJsonArray("forbidden_zones").getJsonObject(0).keySet()));
         assertEquals(List.of(), CalibrationValidator.validate(
                 Json.createReader(new StringReader(reread.toString().replace("800", "640").replace("600", "480"))).readValue(),
                 "P1", PLAN)

@@ -19,7 +19,7 @@ public record Spot(String id, String parkingId, SpotType type, int maxDurationMi
         if (id == null || id.isBlank()) throw new IllegalArgumentException("spot: missing id");
         if (parkingId == null || parkingId.isBlank()) throw new IllegalArgumentException("spot " + id + ": missing parking");
         if (type == null) throw new IllegalArgumentException("spot " + id + ": missing type");
-        if (maxDurationMin <= 0) throw new IllegalArgumentException("spot " + id + ": duree_max_min must be > 0");
+        if (maxDurationMin <= 0) throw new IllegalArgumentException("spot " + id + ": max_duration_min must be > 0");
         if (polygon == null || polygon.size() < 3) throw new IllegalArgumentException("spot " + id + ": polygon needs at least 3 points");
         polygon = List.copyOf(polygon);
         if (state == null) state = SpotState.FREE;

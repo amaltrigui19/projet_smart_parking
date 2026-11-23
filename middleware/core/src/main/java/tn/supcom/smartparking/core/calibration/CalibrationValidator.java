@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  */
 public final class CalibrationValidator {
 
-    private static final Set<String> TYPES = Set.of("normale", "pmr", "electrique");
+    private static final Set<String> TYPES = Set.of("standard", "accessible", "electric");
     private static final Pattern VALID_ID = Pattern.compile("^[A-Za-z0-9_-]+$");
 
     private CalibrationValidator() {
@@ -57,43 +57,43 @@ public final class CalibrationValidator {
         }
 
         Set<String> seenIds = new HashSet<>();
-        JsonValue spots = file.get("places");
+        JsonValue spots = file.get("spots");
         if (spots instanceof JsonArray list) {
             for (int i = 0; i < list.size(); i++) {
                 if (!(list.get(i) instanceof JsonObject spot)) {
-                    errors.add("places[" + i + "] doit être un objet");
+                    errors.add("spots[" + i + "] doit être un objet");
                     continue;
                 }
-                String label = checkId("places[" + i + "]", spot, seenIds, errors);
+                String label = checkId("spots[" + i + "]", spot, seenIds, errors);
                 String type = text(spot.get("type"));
                 if (type == null || !TYPES.contains(type)) {
-                    errors.add(label + " : 'type' doit être l'un de [electrique, normale, pmr]");
+                    errors.add(label + " : 'type' doit être l'un de [accessible, electric, standard]");
                 }
-                JsonValue duration = spot.get("duree_max_min");
+                JsonValue duration = spot.get("max_duration_min");
                 if (!(isInteger(duration) && ((JsonNumber) duration).longValue() >= 1)) {
-                    errors.add(label + " : 'duree_max_min' doit être un entier ≥ 1");
+                    errors.add(label + " : 'max_duration_min' doit être un entier ≥ 1");
                 }
                 String id = text(spot.get("id"));
                 if (id != null && VALID_ID.matcher(id).matches() && !planSpotIds.contains(id)) {
                     errors.add(id + " : cette place n'existe pas dans le plan (" + String.join(", ", planSpotIds) + ")");
                 }
-                checkPolygon(label, spot.get("poly"), width, height, errors);
+                checkPolygon(label, spot.get("polygon"), width, height, errors);
             }
         } else {
-            errors.add("'places' doit être une liste");
+            errors.add("'spots' doit être une liste");
         }
 
-        JsonValue zones = file.get("zones_interdites");
+        JsonValue zones = file.get("forbidden_zones");
         if (zones instanceof JsonArray list) {
             for (int i = 0; i < list.size(); i++) {
                 if (!(list.get(i) instanceof JsonObject zone)) {
-                    errors.add("zones_interdites[" + i + "] doit être un objet");
+                    errors.add("forbidden_zones[" + i + "] doit être un objet");
                     continue;
                 }
-                checkPolygon(checkId("zones_interdites[" + i + "]", zone, seenIds, errors), zone.get("poly"), width, height, errors);
+                checkPolygon(checkId("forbidden_zones[" + i + "]", zone, seenIds, errors), zone.get("polygon"), width, height, errors);
             }
         } else {
-            errors.add("'zones_interdites' doit être une liste");
+            errors.add("'forbidden_zones' doit être une liste");
         }
         return errors;
     }
@@ -112,7 +112,7 @@ public final class CalibrationValidator {
 
     private static void checkPolygon(String label, JsonValue value, long width, long height, List<String> errors) {
         if (!(value instanceof JsonArray polygon) || polygon.size() < 3) {
-            errors.add(label + " : 'poly' doit être une liste d'au moins 3 points");
+            errors.add(label + " : 'polygon' doit être une liste d'au moins 3 points");
             return;
         }
         long[][] points = new long[polygon.size()][];

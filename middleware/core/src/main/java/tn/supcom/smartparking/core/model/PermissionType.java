@@ -2,8 +2,8 @@ package tn.supcom.smartparking.core.model;
 
 /** Permission granted by the operator to use a special spot (contract §2.11). */
 public enum PermissionType {
-    ACCESSIBLE("pmr"),
-    ELECTRIC("electrique");
+    ACCESSIBLE("accessible"),
+    ELECTRIC("electric");
 
     private final String value;
 
@@ -11,7 +11,7 @@ public enum PermissionType {
         this.value = value;
     }
 
-    /** Value stored in MongoDB and exchanged as JSON (current contract wording). */
+    /** Value stored in MongoDB and exchanged as JSON. */
     public String value() {
         return value;
     }

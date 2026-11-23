@@ -2,10 +2,10 @@ package tn.supcom.smartparking.core.model;
 
 /** Type of an anomaly (contract §2.9): the first two come from the Pi, the other two from the server. */
 public enum EventType {
-    STRADDLING("cheval"),
-    FORBIDDEN_ZONE("zone_interdite"),
-    OVERSTAY("ventouse"),
-    UNAUTHORIZED_SPECIAL_SPOT("place_speciale");
+    STRADDLING("straddling"),
+    FORBIDDEN_ZONE("forbidden_zone"),
+    OVERSTAY("overstay"),
+    UNAUTHORIZED_SPECIAL_SPOT("unauthorized_special_spot");
 
     private final String value;
 
@@ -13,7 +13,7 @@ public enum EventType {
         this.value = value;
     }
 
-    /** Value stored in MongoDB and exchanged as JSON (current contract wording). */
+    /** Value stored in MongoDB and exchanged as JSON. */
     public String value() {
         return value;
     }

@@ -32,7 +32,7 @@ class ActivityMapperTest {
     private static Reservation paid() {
         return new Reservation("r_" + ID.toHexString(), SARA, "B2", ReservationState.PAID,
                 T, T.plusSeconds(900), T.plusSeconds(145), T.plusSeconds(4910), 2.25, "TND",
-                new Payment("simule", T.plusSeconds(4940), "RECU-2026-000042"));
+                new Payment("simulated", T.plusSeconds(4940), "RECU-2026-000042"));
     }
 
     // ---------- Reservations ----------
@@ -48,11 +48,11 @@ class ActivityMapperTest {
         Document d = ActivityMapper.toDocument(paid(), ID);
         assertEquals(ID, d.get("_id"));
         assertEquals(new ObjectId("6543a1f0aabbccddeeff0011"), d.get("utilisateur")); // ObjectId, like users._id
-        assertEquals("payee", d.get("etat"));
+        assertEquals("paid", d.get("etat"));
         assertInstanceOf(Date.class, d.get("creee_le"));
         assertInstanceOf(Date.class, d.get("expire_le"));
         Document p = d.get("paiement", Document.class);
-        assertEquals("simule", p.get("moyen"));
+        assertEquals("simulated", p.get("moyen"));
         assertEquals("RECU-2026-000042", p.get("recu"));
         assertInstanceOf(Date.class, p.get("paye_le"));
     }
@@ -69,9 +69,9 @@ class ActivityMapperTest {
     }
 
     @Test
-    void inProgressWrittenWithUnderscore() {
+    void inProgressValue() {
         Document d = ActivityMapper.toDocument(paid().withState(ReservationState.IN_PROGRESS), ID);
-        assertEquals("en_cours", d.get("etat"));
+        assertEquals("in_progress", d.get("etat"));
     }
 
     @Test
@@ -94,7 +94,7 @@ class ActivityMapperTest {
         Permission p = new Permission("aut_" + ID.toHexString(), SARA, PermissionType.ACCESSIBLE,
                 T, null, OPERATOR);
         Document d = ActivityMapper.toDocument(p, ID);
-        assertEquals("pmr", d.get("type"));
+        assertEquals("accessible", d.get("type"));
         assertTrue(d.containsKey("fin"));
         assertNull(d.get("fin"));
         assertInstanceOf(ObjectId.class, d.get("accordee_par"));
@@ -118,8 +118,8 @@ class ActivityMapperTest {
                 T, null, EventSource.SERVER, Map.of("duree_min", 121, "duree_max_min", 120),
                 true, OPERATOR, T.plusSeconds(60), "Conducteur prévenu");
         Document d = ActivityMapper.toDocument(e, ID);
-        assertEquals("ventouse", d.get("type"));
-        assertEquals("serveur", d.get("source"));
+        assertEquals("overstay", d.get("type"));
+        assertEquals("server", d.get("source"));
         assertEquals(121, d.get("details", Document.class).get("duree_min"));
         assertEquals(e, ActivityMapper.toEvent(d));
     }
@@ -129,7 +129,7 @@ class ActivityMapperTest {
         Event e = Event.create("P1", EventType.FORBIDDEN_ZONE, null, "allee1", T, EventSource.PI, null)
                 .withId("evt_" + ID.toHexString());
         Document d = ActivityMapper.toDocument(e, ID);
-        assertEquals("zone_interdite", d.get("type"));
+        assertEquals("forbidden_zone", d.get("type"));
         assertEquals(List.of(), d.get("places"));
         assertNull(d.get("details"));
         assertEquals(false, d.get("traite"));
@@ -139,7 +139,7 @@ class ActivityMapperTest {
     @Test
     void eventWrittenByMongoshWithoutOptionalFields() {
         // Minimal document, as if another tool had written it: missing fields are read as empty
-        Document d = new Document("_id", ID).append("parking", "P1").append("type", "cheval")
+        Document d = new Document("_id", ID).append("parking", "P1").append("type", "straddling")
                 .append("places", List.of("A3", "A4")).append("debut", Date.from(T)).append("source", "pi");
         Event e = ActivityMapper.toEvent(d);
         assertEquals(List.of("A3", "A4"), e.spotIds());

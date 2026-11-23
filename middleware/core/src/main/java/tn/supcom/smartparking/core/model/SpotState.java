@@ -2,8 +2,8 @@ package tn.supcom.smartparking.core.model;
 
 /** Occupancy state of a spot, sent by the Raspberry Pi (contract §5.1). */
 public enum SpotState {
-    FREE("libre"),
-    OCCUPIED("occupee");
+    FREE("free"),
+    OCCUPIED("occupied");
 
     private final String value;
 

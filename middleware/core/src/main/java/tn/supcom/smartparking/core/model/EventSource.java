@@ -3,7 +3,7 @@ package tn.supcom.smartparking.core.model;
 /** Who detected the anomaly: the Pi (straddling, forbidden zone) or the server (overstay, special spot). */
 public enum EventSource {
     PI("pi"),
-    SERVER("serveur");
+    SERVER("server");
 
     private final String value;
 

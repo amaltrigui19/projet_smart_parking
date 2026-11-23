@@ -13,7 +13,7 @@ import java.util.Map;
  * @param spotIds   spots involved (empty for a forbidden zone)
  * @param zone      forbidden zone involved (only for a forbidden zone)
  * @param end       set when the anomaly is over; null otherwise
- * @param details   type-specific data (e.g. overstay: duree_min, duree_max_min); empty if none
+ * @param details   type-specific data (e.g. overstay: duration_min, max_duration_min); empty if none
  * @param handledBy API id of the operator ("u_…")
  */
 public record Event(String id, String parkingId, EventType type, List<String> spotIds, String zone,

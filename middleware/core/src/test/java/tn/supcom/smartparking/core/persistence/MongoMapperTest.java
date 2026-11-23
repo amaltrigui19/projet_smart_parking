@@ -22,7 +22,7 @@ class MongoMapperTest {
             List.of(new Point(40, 60), new Point(130, 60), new Point(130, 200), new Point(40, 200));
 
     private static Spot spotA3() {
-        return new Spot("A3", "P1", SpotType.DISABLED, 120, SQUARE, new PlanRect(30, 0, 8, 13), "A3",
+        return new Spot("A3", "P1", SpotType.ACCESSIBLE, 120, SQUARE, new PlanRect(30, 0, 8, 13), "A3",
                 SpotState.OCCUPIED, Instant.parse("2026-11-20T10:02:11Z"));
     }
 
@@ -36,15 +36,15 @@ class MongoMapperTest {
     void fieldsNamedAsInContract() {
         Document d = MongoMapper.toDocument(spotA3());
         assertEquals("A3", d.get("_id"));
-        assertEquals("pmr", d.get("type"));
+        assertEquals("accessible", d.get("type"));
         assertEquals(120, d.get("duree_max_min"));
-        assertEquals("occupee", d.get("etat"));
+        assertEquals("occupied", d.get("etat"));
         assertEquals(List.of(40, 60), ((List<?>) d.get("poly")).get(0));
     }
 
     @Test
     void readsDecimalNumbersWrittenByMongosh() {
-        Document d = new Document("_id", "A1").append("parking", "P1").append("type", "normale")
+        Document d = new Document("_id", "A1").append("parking", "P1").append("type", "standard")
                 .append("duree_max_min", 120.0)
                 .append("poly", List.of(List.of(149.0, 0.0), List.of(235.0, 0.0), List.of(235.0, 156.0)));
         Spot s = MongoMapper.toSpot(d);

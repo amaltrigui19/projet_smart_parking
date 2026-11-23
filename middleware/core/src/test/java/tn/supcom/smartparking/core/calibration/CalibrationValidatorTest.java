@@ -19,10 +19,10 @@ class CalibrationValidatorTest {
 
     private static final String VALID = """
         {"parking": "P1", "resolution": [640, 480],
-         "places": [
-           {"id": "A1", "type": "pmr", "duree_max_min": 120, "poly": [[40,60],[130,60],[130,200],[40,200]]},
-           {"id": "B4", "type": "electrique", "duree_max_min": 60, "poly": [[340,280],[430,280],[430,420],[340,420]]}],
-         "zones_interdites": [{"id": "allee1", "poly": [[500,210],[639,210],[639,280],[500,280]]}]}
+         "spots": [
+           {"id": "A1", "type": "accessible", "max_duration_min": 120, "polygon": [[40,60],[130,60],[130,200],[40,200]]},
+           {"id": "B4", "type": "electric", "max_duration_min": 60, "polygon": [[340,280],[430,280],[430,420],[340,420]]}],
+         "forbidden_zones": [{"id": "allee1", "polygon": [[500,210],[639,210],[639,280],[500,280]]}]}
         """;
 
     private static JsonValue json(String text) {
@@ -79,14 +79,14 @@ class CalibrationValidatorTest {
 
     @Test
     void unknownType() {
-        contains(errors("\"type\": \"pmr\"", "\"type\": \"reservee\""), "'type' doit être");
+        contains(errors("\"type\": \"accessible\"", "\"type\": \"reserved\""), "'type' doit être");
     }
 
     @Test
     void zeroOrNegativeDuration() {
-        contains(errors("\"duree_max_min\": 120", "\"duree_max_min\": 0"), "duree_max_min");
-        contains(errors("\"duree_max_min\": 120", "\"duree_max_min\": -5"), "duree_max_min");
-        contains(errors("\"duree_max_min\": 120", "\"duree_max_min\": 120.5"), "duree_max_min");
+        contains(errors("\"max_duration_min\": 120", "\"max_duration_min\": 0"), "max_duration_min");
+        contains(errors("\"max_duration_min\": 120", "\"max_duration_min\": -5"), "max_duration_min");
+        contains(errors("\"max_duration_min\": 120", "\"max_duration_min\": 120.5"), "max_duration_min");
     }
 
     @Test
@@ -113,8 +113,8 @@ class CalibrationValidatorTest {
     @Test
     void missingLists() {
         List<String> e = validate(json("{\"parking\": \"P1\", \"resolution\": [640, 480]}"));
-        contains(e, "'places' doit être une liste");
-        contains(e, "'zones_interdites' doit être une liste");
+        contains(e, "'spots' doit être une liste");
+        contains(e, "'forbidden_zones' doit être une liste");
     }
 
     @Test
@@ -124,7 +124,7 @@ class CalibrationValidatorTest {
 
     @Test
     void severalErrorsInOneMessage() {
-        String modified = VALID.replace("\"id\": \"B4\"", "\"id\": \"A1\"").replace("\"duree_max_min\": 120", "\"duree_max_min\": 0");
+        String modified = VALID.replace("\"id\": \"B4\"", "\"id\": \"A1\"").replace("\"max_duration_min\": 120", "\"max_duration_min\": 0");
         List<String> e = validate(json(modified));
         assertEquals(2, e.size(), e.toString());
         String message = new InvalidConfigException(e).getMessage();

@@ -47,7 +47,7 @@ class ActivityModelsTest {
                 ReservationState.CANCELLED, ReservationState.EXPIRED)) {
             assertFalse(s.isOpen(), s.name());
         }
-        assertEquals(ReservationState.IN_PROGRESS, ReservationState.fromValue("en_cours"));
+        assertEquals(ReservationState.IN_PROGRESS, ReservationState.fromValue("in_progress"));
     }
 
     @Test
@@ -80,9 +80,9 @@ class ActivityModelsTest {
 
     @Test
     void valuesLowercaseAsInContract() {
-        assertEquals("zone_interdite", EventType.FORBIDDEN_ZONE.value());
-        assertEquals("place_speciale", EventType.UNAUTHORIZED_SPECIAL_SPOT.value());
-        assertEquals("electrique", PermissionType.ELECTRIC.value());
+        assertEquals("forbidden_zone", EventType.FORBIDDEN_ZONE.value());
+        assertEquals("unauthorized_special_spot", EventType.UNAUTHORIZED_SPECIAL_SPOT.value());
+        assertEquals("electric", PermissionType.ELECTRIC.value());
         assertEquals(EventSource.PI, EventSource.fromValue("pi"));
     }
 }

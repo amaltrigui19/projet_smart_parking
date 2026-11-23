@@ -76,23 +76,24 @@ cd iot
 python -m unittest test_capture -v
 ```
 
-## Contrat MQTT (à valider avec la partie serveur)
+## Contrat MQTT (contrat en anglais, `docs/contrats.md` §5)
 
 | Topic | Exemple de message | Envoyé quand |
 |---|---|---|
-| `parking/P1/places/<id>` | `{"place":"A3","etat":"occupee","depuis":"2026-11-20T10:02:11Z"}` | une place change d'état (retain, QoS 1) |
-| `parking/P1/evenements` | `{"type":"cheval","places":["A3","A4"],"ts":"..."}` | début d'une anomalie |
-| `parking/P1/evenements` | `{"type":"zone_interdite","zone":"allee1","ts":"..."}` | début d'une anomalie |
-| `parking/P1/pi/statut` | `{"en_ligne":true,"fps":0.8,"temp_cpu":61}` | toutes les 60 s |
+| `parking/P1/spots/<id>` | `{"spot":"A3","state":"occupied","since":"2026-11-20T10:02:11Z"}` | une place change d'état (retain, QoS 1) |
+| `parking/P1/events` | `{"type":"straddling","spots":["A3","A4"],"ts":"..."}` | début d'une anomalie |
+| `parking/P1/events` | `{"type":"forbidden_zone","zone":"allee1","ts":"..."}` | début d'une anomalie |
+| `parking/P1/pi/status` | `{"online":true,"fps":0.8,"cpu_temp":61}` | toutes les 60 s |
 
-- `etat` : `libre` ou `occupee`.
-- La règle « véhicule ventouse » est calculée par le serveur à partir du champ `depuis`.
+- `state` : `free` ou `occupied`.
+- La règle « véhicule ventouse » (`overstay`) est calculée par le serveur à partir du champ `since`.
 - Connexion au broker Mosquitto en TLS (port 8883).
 
 ## Contrat des polygones (à valider avec la partie application)
 
 Le fichier `places.json` décrit le contour de chaque place sur l'image de la caméra
-(coordonnées en pixels). Il sera généré par l'outil de calibration de l'application ;
+(coordonnées en pixels) : `parking`, `resolution`, `spots[id, type, max_duration_min, polygon]`,
+`forbidden_zones[id, polygon]`. Il sera généré par l'outil de calibration de l'application ;
 `places.exemple.json` sert de modèle en attendant.
 
 ## Structure prévue

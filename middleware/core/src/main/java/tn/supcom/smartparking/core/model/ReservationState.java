@@ -8,11 +8,11 @@ import java.util.Set;
  */
 public enum ReservationState {
     ACTIVE("active"),
-    IN_PROGRESS("en_cours"),
-    COMPLETED("terminee"),
-    PAID("payee"),
-    CANCELLED("annulee"),
-    EXPIRED("expiree");
+    IN_PROGRESS("in_progress"),
+    COMPLETED("completed"),
+    PAID("paid"),
+    CANCELLED("cancelled"),
+    EXPIRED("expired");
 
     /** A driver has at most one reservation in these states, and so does a spot. */
     public static final Set<ReservationState> OPEN = Set.of(ACTIVE, IN_PROGRESS);
@@ -23,7 +23,7 @@ public enum ReservationState {
         this.value = value;
     }
 
-    /** Value stored in MongoDB and exchanged as JSON (current contract wording). */
+    /** Value stored in MongoDB and exchanged as JSON. */
     public String value() {
         return value;
     }

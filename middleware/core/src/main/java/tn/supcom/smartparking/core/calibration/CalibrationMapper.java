@@ -27,10 +27,10 @@ public final class CalibrationMapper {
     /** Spots of the file. Only id, type, max duration and polygon matter: state and plan data stay in the database. */
     public static List<Spot> spots(JsonObject file, String parkingId) {
         List<Spot> spots = new ArrayList<>();
-        for (JsonValue v : file.getJsonArray("places")) {
+        for (JsonValue v : file.getJsonArray("spots")) {
             JsonObject s = v.asJsonObject();
             spots.add(new Spot(s.getString("id"), parkingId, SpotType.fromValue(s.getString("type")),
-                    s.getInt("duree_max_min"), points(s.getJsonArray("poly")), null, null, null, null));
+                    s.getInt("max_duration_min"), points(s.getJsonArray("polygon")), null, null, null, null));
         }
         return spots;
     }
@@ -41,12 +41,12 @@ public final class CalibrationMapper {
      */
     public static List<ForbiddenZone> zones(JsonObject file, Parking existing) {
         List<ForbiddenZone> zones = new ArrayList<>();
-        for (JsonValue v : file.getJsonArray("zones_interdites")) {
+        for (JsonValue v : file.getJsonArray("forbidden_zones")) {
             JsonObject z = v.asJsonObject();
             String id = z.getString("id");
             PlanRect rect = existing == null ? null : existing.forbiddenZones().stream()
                     .filter(e -> e.id().equals(id)).map(ForbiddenZone::planRect).findFirst().orElse(null);
-            zones.add(new ForbiddenZone(id, points(z.getJsonArray("poly")), rect));
+            zones.add(new ForbiddenZone(id, points(z.getJsonArray("polygon")), rect));
         }
         return zones;
     }
@@ -64,16 +64,16 @@ public final class CalibrationMapper {
         spots.stream().sorted(Comparator.comparing(Spot::id)).forEach(s -> spotList.add(Json.createObjectBuilder()
                 .add("id", s.id())
                 .add("type", s.type().value())
-                .add("duree_max_min", s.maxDurationMin())
-                .add("poly", polygon(s.polygon()))));
+                .add("max_duration_min", s.maxDurationMin())
+                .add("polygon", polygon(s.polygon()))));
         JsonArrayBuilder zoneList = Json.createArrayBuilder();
         parking.forbiddenZones().stream().sorted(Comparator.comparing(ForbiddenZone::id))
-                .forEach(z -> zoneList.add(Json.createObjectBuilder().add("id", z.id()).add("poly", polygon(z.polygon()))));
+                .forEach(z -> zoneList.add(Json.createObjectBuilder().add("id", z.id()).add("polygon", polygon(z.polygon()))));
         return Json.createObjectBuilder()
                 .add("parking", parking.id())
                 .add("resolution", Json.createArrayBuilder().add(parking.widthPx()).add(parking.heightPx()))
-                .add("places", spotList)
-                .add("zones_interdites", zoneList)
+                .add("spots", spotList)
+                .add("forbidden_zones", zoneList)
                 .build();
     }
 
