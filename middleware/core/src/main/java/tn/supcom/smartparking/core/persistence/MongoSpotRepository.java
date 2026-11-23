@@ -10,7 +10,9 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import org.bson.Document;
@@ -77,5 +79,14 @@ public class MongoSpotRepository implements SpotRepository {
                     new UpdateOptions().upsert(true));
         }
         collection().deleteMany(Filters.and(Filters.eq("parking", parkingId), Filters.nin("_id", ids)));
+    }
+
+    @Override
+    public boolean updateState(String id, SpotState state, Instant since) {
+        return collection().updateOne(Filters.eq("_id", id),
+                Updates.combine(
+                        Updates.set("state", state.value()),
+                        Updates.set("since", since == null ? null : Date.from(since))))
+                .getMatchedCount() == 1;
     }
 }

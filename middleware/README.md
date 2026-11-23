@@ -273,3 +273,27 @@ Après `seed.js` (P1 et ses places), depuis la racine du dépôt :
 
 - `exemples.js` est relançable (identifiants fixes, upsert ; les dates sont recalculées par rapport à maintenant). Il crée deux conducteurs `sara@exemple.tn` et `youssef@exemple.tn` (mot de passe de test dans le script), une autorisation PMR pour Sara, des réservations dans plusieurs états (dont une **active sur B3**, utile pour le plan SVG) et un événement de chaque type. **Local seulement** : le mot de passe est connu, ne pas le lancer sur la VM.
 - `verifier-schema.js` vérifie, avec `explain()`, que chaque requête de l'API utilise son index, et que la base refuse une 2ᵉ réservation ouverte. Il ne laisse aucune trace. Résultat attendu : `0 en échec`.
+## Plan des places en temps réel (sprint 4)
+
+Contrat §1.4 et §2.6 (noms anglais).
+
+| Route | Rôle | Réponse |
+|---|---|---|
+| `GET /api/spots` | connecté | `200` `{parking, ts, summary {total, free, occupied, reserved}, spots [{id, type, state, since, max_duration_min}]}` |
+| `GET /api/spots/{id}` | connecté | `200` avec les mêmes champs + `overdue` ; pour l'opérateur, `lock` (`null` jusqu'au guidage, sprint 7) ; `404 not_found` |
+| `WS /api/ws/spots?token=<jwt>` | connecté | Un message `{"spot", "state", "since"}` à chaque changement ; sans jeton valide, connexion fermée avec le code `1008` |
+| `PUT /api/spots/{id}/state` | OPERATOR | **Simulation seulement** (`SMARTPARKING_SIMULATION=true`) : corps `{"state": "occupied"}`, joue le rôle du Pi pour la démo. Sinon `404`. Remplacée par la réception MQTT au sprint 5 |
+
+- `core/spots/SpotManager` : toute la logique. Une place `free` avec une réservation ouverte est renvoyée `reserved` (jamais stocké : le Pi ne connaît que `free` et `occupied`). `overdue` = occupée depuis plus de `max_duration_min`.
+- Chaque changement d'état déclenche l'événement CDI `SpotStateChanged`, que `api/spots/SpotBroadcaster` envoie à toutes les connexions WebSocket ouvertes. Au sprint 5, la réception MQTT n'aura qu'à appeler `SpotManager.updateState`.
+- Le WebSocket vérifie le jeton avec le `TokenValidator` du module IAM (signature, `kid`, émetteur, expiration), car un navigateur ne peut pas envoyer d'en-tête `Authorization` sur un WebSocket.
+- Tests : `core/spots/SpotManagerTest` utilise des dépôts **en mémoire** (implémentations des interfaces `SpotRepository` et `ReservationRepository`), sans MongoDB.
+
+Démo (simulation activée, jeton opérateur dans `$JETON`) :
+
+```bash
+curl -s https://localhost/api/spots -H "Authorization: Bearer $JETON" --cacert server/certs/ca.pem
+curl -s -X PUT https://localhost/api/spots/A2/state -H "Authorization: Bearer $JETON" \
+     -H 'Content-Type: application/json' -d '{"state":"occupied"}' --cacert server/certs/ca.pem
+# le plan ouvert dans la PWA (abonné à /api/ws/spots) passe A2 en « occupée » sans recharger
+```
