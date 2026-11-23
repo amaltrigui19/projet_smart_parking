@@ -15,13 +15,13 @@ import tn.supcom.smartparking.core.calibration.CalibrationManager;
 
 /**
  * GET and PUT /api/config/polygones (contract §2.10): the places.json calibration file (§5.2).
- * Operator only. This controller only handles HTTP; the logic lives in {@link CalibrationManager}.
+ * Operator only (role OPERATOR). This controller only handles HTTP; the logic lives in {@link CalibrationManager}.
  * The route path stays as in the current contract until the English contract is agreed.
  */
 @Path("/config/polygones")
 @RequestScoped
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed("EXPLOITANT")
+@RolesAllowed("OPERATOR")
 public class CalibrationResource {
 
     @Inject

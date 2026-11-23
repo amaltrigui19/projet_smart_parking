@@ -17,13 +17,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 /**
  * Single MongoDB connection shared by every repository.
  * Settings come from MicroProfile Config, i.e. the WildFly environment variables set in
- * server/docker-compose.yml. The variable names will follow the English contract once it is agreed.
+ * server/docker-compose.yml. Same variable names as the IAM module (MONGO_HOST, MONGO_USER…).
  */
 @ApplicationScoped
 public class MongoConnection {
 
     @Inject
-    @ConfigProperty(name = "MONGO_HOTE", defaultValue = "mongo")
+    @ConfigProperty(name = "MONGO_HOST", defaultValue = "mongo")
     String host;
 
     @Inject
@@ -31,15 +31,15 @@ public class MongoConnection {
     int port;
 
     @Inject
-    @ConfigProperty(name = "MONGO_UTILISATEUR")
+    @ConfigProperty(name = "MONGO_USER")
     Optional<String> user;
 
     @Inject
-    @ConfigProperty(name = "MONGO_MOT_DE_PASSE")
+    @ConfigProperty(name = "MONGO_PASSWORD")
     Optional<String> password;
 
     @Inject
-    @ConfigProperty(name = "MONGO_BASE", defaultValue = "smartparking")
+    @ConfigProperty(name = "MONGO_DATABASE", defaultValue = "smartparking")
     String databaseName;
 
     private MongoClient client;

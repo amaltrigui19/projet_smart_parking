@@ -28,7 +28,7 @@ public class HealthResource {
     private static final String VERSION = "0.1.0";
 
     @Inject
-    @ConfigProperty(name = "MONGO_HOTE", defaultValue = "mongo")
+    @ConfigProperty(name = "MONGO_HOST", defaultValue = "mongo")
     String mongoHost;
 
     @Inject

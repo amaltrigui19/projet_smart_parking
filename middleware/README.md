@@ -232,18 +232,18 @@ cd middleware && mvn test     # 29 tests dans core (conversion, identifiants, mo
 
 ## Base MongoDB : schéma 2 (sprint 4)
 
-Collections `autorisations`, `reservations` et `evenements` du contrat §2.14, dans `core/`. La collection `utilisateurs` existe déjà depuis le sprint 3 (`iam/DepotUtilisateurs`). Les routes qui les utilisent viennent aux sprints 6 à 8 : ce sprint prépare le modèle, l'accès aux données et les index.
+Collections `autorisations`, `reservations` et `evenements` du contrat §2.14, dans `core/`. La collection des comptes appartient au module IAM (`iam/repository/MongoUserRepository`). Les routes qui les utilisent viennent aux sprints 6 à 8 : ce sprint prépare le modèle, l'accès aux données et les index.
 
 | Classe | Rôle |
 |---|---|
-| `modele/Autorisation`, `TypeAutorisation` | Autorisation `pmr` / `electrique`, `valideLe(instant)` (début inclus, fin exclue, `fin = null` = sans fin) |
-| `modele/Reservation`, `EtatReservation`, `Paiement` | États du contrat §2.8 ; `EtatReservation.OUVERTS` = `active`, `en_cours` |
-| `modele/Evenement`, `TypeEvenement`, `SourceEvenement` | Anomalies `cheval`, `zone_interdite` (Pi), `ventouse`, `place_speciale` (serveur) |
-| `donnees/Identifiants` | `ObjectId` en base ↔ `u_…`, `r_…`, `evt_…`, `aut_…` dans l'API |
-| `donnees/ConversionActivite` | Traduction Java ↔ documents MongoDB. Les références à un utilisateur (`utilisateur`, `accordee_par`, `traite_par`) sont des `ObjectId`, comme `utilisateurs._id` |
-| `donnees/DepotAutorisations` | `creer`, `duUtilisateur`, `aUneValide(utilisateur, type, instant)`, `supprimer` |
-| `donnees/DepotReservations` | `creer`, `parId`, `lister(utilisateur, etat, limite)`, `ouverteDuUtilisateur`, `ouverteSurPlace`, `ouvertes`, `mettreAJour(r, etatAttendu)` |
-| `donnees/DepotEvenements` | `creer`, `parId`, `lister(traite, type, du, au, limite)`, `nombreNonTraites`, `marquerTraite`, `terminer` |
+| `model/Permission`, `PermissionType` | Autorisation `pmr` / `electrique`, `isValidAt(instant)` (début inclus, fin exclue, `end = null` = sans fin) |
+| `model/Reservation`, `ReservationState`, `Payment` | États du contrat §2.8 ; `ReservationState.OPEN` = `active`, `en_cours` |
+| `model/Event`, `EventType`, `EventSource` | Anomalies `cheval`, `zone_interdite` (Pi), `ventouse`, `place_speciale` (serveur) |
+| `persistence/ApiIds` | `ObjectId` en base ↔ `u_…`, `r_…`, `evt_…`, `aut_…` dans l'API |
+| `persistence/ActivityMapper` | Traduction Java ↔ documents MongoDB. Les références à un utilisateur (`utilisateur`, `accordee_par`, `traite_par`) sont des `ObjectId`, comme `utilisateurs._id` |
+| `persistence/PermissionRepository` (+ `MongoPermissionRepository`) | `create`, `findByUser`, `hasValid(userId, type, instant)`, `delete` |
+| `persistence/ReservationRepository` (+ `MongoReservationRepository`) | `create`, `findById`, `list(userId, state, limit)`, `findOpenByUser`, `findOpenBySpot`, `findOpen`, `update(r, expectedState)` |
+| `persistence/EventRepository` (+ `MongoEventRepository`) | `create`, `findById`, `list(handled, type, from, to, limit)`, `countUnhandled`, `markHandled`, `close` |
 
 ### Index
 
@@ -257,7 +257,7 @@ Collections `autorisations`, `reservations` et `evenements` du contrat §2.14, d
 | `evenements` | `traite_debut` : `{traite, debut: -1}` | alertes non traitées |
 | `evenements` | `type_debut` : `{type, debut: -1}` | filtre par type et par date |
 
-Les deux index uniques partiels ne sont pas dans le contrat : ils font respecter les règles du §2.8 **par la base**, même si deux requêtes arrivent en même temps. `DepotReservations` les traduit en `ReservationEnConflit` (motif `UTILISATEUR` ou `PLACE`), que l'API traduira en `409`. Une réservation terminée, payée, annulée ou expirée n'est pas concernée : l'historique peut en contenir autant qu'on veut.
+Les deux index uniques partiels ne sont pas dans le contrat : ils font respecter les règles du §2.8 **par la base**, même si deux requêtes arrivent en même temps. `MongoReservationRepository` les traduit en `ReservationConflictException` (motif `USER` ou `SPOT`), que l'API traduira en `409`. Une réservation terminée, payée, annulée ou expirée n'est pas concernée : l'historique peut en contenir autant qu'on veut.
 
 Les index sont créés par les DAO au premier accès **et** par `server/mongo/index.js`, avec les mêmes noms et options. Si on en change un, il faut changer l'autre : sinon MongoDB refuse avec `IndexOptionsConflict`.
 
