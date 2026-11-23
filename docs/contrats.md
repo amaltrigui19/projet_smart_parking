@@ -2,6 +2,8 @@
 
 Les trois parties du projet (IoT, serveur, PWA) sont développées en parallèle par des personnes différentes. Un **contrat** fixe ce qu'une partie envoie ou attend d'une autre : tant qu'il est respecté, chacune avance sans attendre les autres, avec des données simulées si besoin.
 
+**Noms en anglais.** Depuis la refonte demandée par le prof, tous les noms techniques (routes, champs JSON, valeurs, codes d'erreur, collections, topics MQTT, variables d'environnement) sont en anglais, selon `docs/proposition-contrat-anglais.md` validée par les trois. Les textes montrés aux utilisateurs (`message`, `title`, `body`) restent en français.
+
 **Un seul fichier, une section par partie.** Chaque section est écrite par la personne du domaine, puis relue par les deux autres. Un contrat ne change jamais sans l'accord des trois : on ouvre une PR qui ne touche que sa section et on prévient dans le groupe.
 
 | Section | Rédaction | Statut |
@@ -28,13 +30,13 @@ La PWA est la seule application cliente. Cette section dit **ce qu'elle attend d
 - **Toutes les routes de l'API sont sous `/api`**, et le WebSocket sous `/api/ws`. Le service worker de la PWA ne met jamais en cache ce qui commence par `/api`.
 - Format JSON en UTF-8. Dates en **ISO 8601 UTC** avec `Z` (`2026-11-20T10:02:11Z`) ; la PWA convertit en heure locale à l'affichage.
 - Identifiants : parking `P1`, places `A1`, `A2`… (comme dans `places.exemple.json`), zones interdites `allee1`…
-- Erreurs : code HTTP adapté (400, 401, 403, 404, 409) et corps `{"erreur": "code_court", "message": "texte lisible"}`. La PWA affiche `message` à l'utilisateur.
-- Noms d'anomalie identiques partout (MQTT, API, push) : `cheval`, `ventouse`, `place_speciale`, `zone_interdite`.
+- Erreurs : code HTTP adapté (400, 401, 403, 404, 409) et corps `{"error": "code_court", "message": "texte lisible"}`. La PWA affiche `message` à l'utilisateur.
+- Noms d'anomalie identiques partout (MQTT, API, push) : `straddling`, `overstay`, `unauthorized_special_spot`, `forbidden_zone`.
 
 ### 1.2 Authentification
 
 - La PWA envoie `Authorization: Bearer <jwt>` sur chaque appel.
-- Le JWT contient l'identifiant de l'utilisateur (`sub`), son rôle (`role` : `CONDUCTEUR` ou `EXPLOITANT`) et une expiration (`exp`). La PWA lit le `role` pour choisir l'interface à afficher ; **la sécurité reste côté serveur**, qui vérifie le rôle à chaque appel.
+- Le JWT contient l'identifiant de l'utilisateur (`sub`), son rôle (`role` : `DRIVER` ou `OPERATOR`) et une expiration (`exp`). La PWA lit le `role` pour choisir l'interface à afficher ; **la sécurité reste côté serveur**, qui vérifie le rôle à chaque appel.
 - Si l'API répond `401`, la PWA efface le jeton et renvoie vers la page de connexion. Si elle répond `403`, elle affiche « accès refusé ».
 - Le jeton est gardé dans `sessionStorage` (pas dans `localStorage`) ; il n'est jamais mis dans une URL.
 
@@ -43,7 +45,7 @@ La PWA est la seule application cliente. Cette section dit **ce qu'elle attend d
 | Écran | Besoin | Rôle |
 |---|---|---|
 | Inscription, connexion | Créer un compte, obtenir un JWT | public |
-| Plan du parking (les deux) | Liste des places avec leur état (`libre`, `occupee`, `reservee`), type (`normale`, `pmr`, `electrique`) et polygone | tous |
+| Plan du parking (les deux) | Liste des places avec leur état (`free`, `occupied`, `reserved`), type (`standard`, `accessible`, `electric`) et polygone | tous |
 | Plan en temps réel | Flux WebSocket des changements (voir 1.4) | tous |
 | Réservation | Créer, annuler, lister ses réservations, payer (simulé) | conducteur |
 | Guidage | Trajet de l'entrée vers la place libre la plus proche (liste de points du graphe) et verrouillage de la place | conducteur |
@@ -56,11 +58,11 @@ La PWA est la seule application cliente. Cette section dit **ce qu'elle attend d
 
 ### 1.4 Temps réel (WebSocket)
 
-- Connexion : `/api/ws/places?token=<jwt>` (un navigateur ne peut pas mettre d'en-tête `Authorization` sur un WebSocket). Le serveur refuse la connexion sans JWT valide.
+- Connexion : `/api/ws/spots?token=<jwt>` (un navigateur ne peut pas mettre d'en-tête `Authorization` sur un WebSocket). Le serveur refuse la connexion sans JWT valide.
 - Message reçu à chaque changement d'état d'une place :
 
 ```json
-{ "place": "A3", "etat": "occupee", "depuis": "2026-11-20T10:02:11Z" }
+{ "spot": "A3", "state": "occupied", "since": "2026-11-20T10:02:11Z" }
 ```
 
 - À la connexion, la PWA charge d'abord l'état complet par l'API REST, puis applique les messages WebSocket. Si le WebSocket se coupe, elle se reconnecte toute seule et recharge l'état complet.
@@ -73,9 +75,9 @@ Web Push avec clés VAPID. La clé **privée** reste dans une variable d'environ
 
 | Route | Rôle | Description |
 |---|---|---|
-| `GET /api/push/cle-publique` | public | Renvoie `{"cle": "<clé publique VAPID en base64url>"}` |
-| `POST /api/push/abonnements` | connecté | Le corps est l'objet `PushSubscription` du navigateur, tel quel (`endpoint`, `keys.p256dh`, `keys.auth`). `201` à la création, `200` si l'`endpoint` existe déjà (appel idempotent). |
-| `DELETE /api/push/abonnements` | connecté | Corps `{"endpoint": "..."}`, réponse `204`. |
+| `GET /api/push/public-key` | public | Renvoie `{"key": "<clé publique VAPID en base64url>"}` |
+| `POST /api/push/subscriptions` | connecté | Le corps est l'objet `PushSubscription` du navigateur, tel quel (`endpoint`, `keys.p256dh`, `keys.auth`). `201` à la création, `200` si l'`endpoint` existe déjà (appel idempotent). |
+| `DELETE /api/push/subscriptions` | connecté | Corps `{"endpoint": "..."}`, réponse `204`. |
 
 Un utilisateur peut avoir plusieurs abonnements. Si le service de push répond `404` ou `410` à un envoi, le serveur supprime l'abonnement.
 
@@ -83,36 +85,36 @@ Un utilisateur peut avoir plusieurs abonnements. Si le service de push répond `
 
 ```json
 {
-  "type": "cheval",
-  "titre": "Voiture à cheval",
-  "corps": "Une voiture occupe les places A3 et A4.",
+  "type": "straddling",
+  "title": "Voiture à cheval",
+  "body": "Une voiture occupe les places A3 et A4.",
   "url": "/exploitant#alertes",
   "ts": "2026-11-20T10:02:11Z",
   "id": "evt_8f3a",
-  "donnees": { "places": ["A3", "A4"] }
+  "data": { "spots": ["A3", "A4"] }
 }
 ```
 
-`type`, `titre`, `corps`, `url` (chemin relatif dans la PWA), `ts` et `id` sont obligatoires ; `id` sert à ne pas afficher deux fois la même notification.
+`type`, `title`, `body`, `url` (chemin relatif dans la PWA), `ts` et `id` sont obligatoires ; `id` sert à ne pas afficher deux fois la même notification.
 
 | `type` | Destinataire | Déclenché quand |
 |---|---|---|
-| `reservation_confirmee` | Conducteur | La réservation est créée |
-| `fin_duree` | Conducteur | Il reste peu de temps avant la fin de la durée autorisée |
-| `place_a_liberer` | Conducteur | La durée autorisée est dépassée |
-| `place_prise` | Conducteur | La place proposée par le guidage a été prise, le trajet est recalculé |
-| `cheval` | Exploitant | Une voiture est à cheval sur deux places |
-| `ventouse` | Exploitant | Durée autorisée dépassée ou véhicule présent plusieurs jours |
-| `place_speciale` | Exploitant | Place PMR, électrique ou réservée occupée sans autorisation |
-| `zone_interdite` | Exploitant | Un véhicule est dans une zone interdite |
+| `reservation_confirmed` | Conducteur | La réservation est créée |
+| `time_almost_up` | Conducteur | Il reste peu de temps avant la fin de la durée autorisée |
+| `spot_overdue` | Conducteur | La durée autorisée est dépassée |
+| `spot_taken` | Conducteur | La place proposée par le guidage a été prise, le trajet est recalculé |
+| `straddling` | Exploitant | Une voiture est à cheval sur deux places |
+| `overstay` | Exploitant | Durée autorisée dépassée ou véhicule présent plusieurs jours |
+| `unauthorized_special_spot` | Exploitant | Place PMR, électrique ou réservée occupée sans autorisation |
+| `forbidden_zone` | Exploitant | Un véhicule est dans une zone interdite |
 
-Les noms `cheval` et `zone_interdite` sont ceux du contrat MQTT ; `ventouse` et `place_speciale` sont calculés par le serveur.
+Les noms `straddling` et `forbidden_zone` sont ceux du contrat MQTT ; `overstay` et `unauthorized_special_spot` sont calculés par le serveur.
 
-**Côté PWA** (service worker) : à la réception, affichage de la notification avec `titre` et `corps` (un même `id` remplace la précédente) ; au clic, ouverture ou mise au premier plan de la PWA sur `url`. La permission n'est demandée qu'après une action de l'utilisateur (bouton « Activer les notifications »). Sur iPhone, la PWA doit d'abord être ajoutée à l'écran d'accueil.
+**Côté PWA** (service worker) : à la réception, affichage de la notification avec `title` et `body` (un même `id` remplace la précédente) ; au clic, ouverture ou mise au premier plan de la PWA sur `url`. La permission n'est demandée qu'après une action de l'utilisateur (bouton « Activer les notifications »). Sur iPhone, la PWA doit d'abord être ajoutée à l'écran d'accueil.
 
 ### 1.6 Outil de calibration (polygones)
 
-La PWA fournit l'outil qui dessine les places sur une photo de la maquette. Il produit un fichier au format de `iot/places.exemple.json` (`parking`, `resolution`, `places[id, type, duree_max_min, poly]`, `zones_interdites`), coordonnées **en pixels de l'image de la caméra**. Le serveur l'enregistre et le Pi le lit : le format est donc celui de la section 5.
+La PWA fournit l'outil qui dessine les places sur une photo de la maquette. Il produit un fichier au format de `iot/places.exemple.json` (`parking`, `resolution`, `spots[id, type, max_duration_min, polygon]`, `forbidden_zones`), coordonnées **en pixels de l'image de la caméra**. Le serveur l'enregistre et le Pi le lit : le format est donc celui de la section 5.
 
 ### 1.7 Ce que la PWA attend de la maquette (section 4)
 
@@ -120,10 +122,10 @@ Pour dessiner le plan SVG et le trajet : la **liste des places** avec leur numé
 
 ### 1.8 Questions ouvertes
 
-1. Le conducteur reçoit-il `ventouse` quand c'est son véhicule ? (proposition : non, seulement `place_a_liberer`)
-2. Délai de `fin_duree` : 10 minutes avant la fin ? (proposition : oui)
+1. Le conducteur reçoit-il `overstay` quand c'est son véhicule ? (proposition : non, seulement `spot_overdue`)
+2. Délai de `time_almost_up` : 10 minutes avant la fin ? (proposition : oui)
 3. Adresse d'équipe pour le sujet VAPID (`mailto:`) : laquelle ?
-4. L'état `reservee` d'une place : porté par l'API des places, ou à déduire des réservations ?
+4. L'état `reserved` d'une place : porté par l'API des places, ou à déduire des réservations ?
 
 ---
 
@@ -131,31 +133,32 @@ Pour dessiner le plan SVG et le trajet : la **liste des places** avec leur numé
 
 Rédaction : Maissa (serveur) · Statut : proposition, à relire par Eya (PWA) et Amal (IoT)
 
-Cette section répond aux besoins listés en 1.3 à 1.5. Les noms des routes sont en français, comme celles d'Eya (`/api/push/cle-publique`) ; ils remplacent les noms provisoires de `repartition_travail.md` (`/auth/register` devient `/api/auth/inscription`, etc.).
+Cette section répond aux besoins listés en 1.3 à 1.5. Les noms des routes et des champs sont en anglais (voir l'en-tête de ce fichier).
 
 ### 2.1 Conventions
 
 - **URL de base** : `https://smartparking-supcom.duckdns.org/api` (VM AWS ; l'API y sera déployée au sprint 2) et `https://localhost/api` en local (`server/`, voir `docs/installation-serveur.md`).
 - Préfixe **`/api`**, JSON en UTF-8, dates ISO 8601 UTC avec `Z` (voir 1.1).
-- Noms des champs en `snake_case`, sans accents (`duree_max_min`, `mot_de_passe`).
+- Noms des champs en `snake_case`, sans accents (`max_duration_min`, `password`).
 - Un seul parking dans le projet : `P1`. Les routes ne le répètent pas ; il figure dans les réponses quand c'est utile.
-- Identifiants : places `A1`…`B4`, nœuds du graphe `E`, `I1`…, `S` (section 4), utilisateurs `u_…`, réservations `r_…`, événements `evt_…`, autorisations `aut_…`.
-- **Erreurs** : toujours `{"erreur": "code_court", "message": "texte lisible"}`. Codes communs à toutes les routes :
+- Identifiants : places `A1`…`B4`, nœuds du graphe `E`, `I1`…, `S` (section 4), utilisateurs `u_…`, réservations `r_…`, événements `evt_…`, autorisations `perm_…`.
+- **Erreurs** : toujours `{"error": "code_court", "message": "texte lisible"}`. Codes communs à toutes les routes :
 
-| HTTP | `erreur` | Quand |
+| HTTP | `error` | Quand |
 |---|---|---|
-| 400 | `requete_invalide` | JSON mal formé, champ manquant ou hors limites (le `message` dit lequel) |
-| 401 | `non_authentifie` | JWT absent, invalide ou expiré |
-| 403 | `acces_refuse` | Le rôle ne permet pas cette route |
-| 404 | `introuvable` | L'objet demandé n'existe pas |
-| 500 | `erreur_serveur` | Erreur interne (détail dans les journaux du serveur, jamais dans la réponse) |
+| 400 | `invalid_request` | JSON mal formé, champ manquant ou hors limites (le `message` dit lequel) |
+| 401 | `unauthenticated` | JWT absent, invalide ou expiré |
+| 403 | `forbidden` | Le rôle ne permet pas cette route |
+| 404 | `not_found` | L'objet demandé n'existe pas |
+| 500 | `server_error` | Erreur interne (détail dans les journaux du serveur, jamais dans la réponse) |
 
 Les codes propres à chaque route (souvent `409`) sont donnés avec la route.
 
 ### 2.2 Authentification et JWT
 
 - En-tête sur chaque appel protégé : `Authorization: Bearer <jwt>`.
-- JWT signé **RS256** (format MicroProfile JWT, pris en charge par WildFly). La clé privée est dans une variable d'environnement de la VM, jamais dans Git.
+- JWT signé **RS256** par le module IAM (format MicroProfile JWT, pris en charge par WildFly), avec un **`kid`** dans l'en-tête. Les clés privées sont des fichiers `<kid>.pem` sur la VM (`JWT_KEYS_DIR`), jamais dans Git.
+- **JWKS** : `GET /.well-known/jwks.json` (public) publie les clés publiques au format JWK (`kty`, `n`, `e`, `kid`, `use: sig`, `alg: RS256`). L'API vérifie les jetons avec ces clés, choisies d'après le `kid` ; c'est ce qui permet la rotation des clés sans redémarrage.
 - Contenu du jeton :
 
 ```json
@@ -163,107 +166,110 @@ Les codes propres à chaque route (souvent `409`) sont donnés avec la route.
   "iss": "smartparking",
   "sub": "u_6543a1f0",
   "upn": "sara@exemple.tn",
-  "role": "CONDUCTEUR",
-  "groups": ["CONDUCTEUR"],
+  "role": "DRIVER",
+  "groups": ["DRIVER"],
   "iat": 1795168800,
   "exp": 1795172400
 }
 ```
 
-`role` est lu par la PWA (1.2) ; `groups` est lu par WildFly pour `@RolesAllowed`. Durée de vie : **1 heure**. Pas de jeton de rafraîchissement au sprint 3 : à l'expiration, l'utilisateur se reconnecte.
+`role` est lu par la PWA (1.2) ; `groups` est lu par WildFly pour `@RolesAllowed`. Durée de vie : **1 heure**. Pas de jeton de rafraîchissement : à l'expiration, l'utilisateur se reconnecte.
 
-Colonne « Rôle » des tableaux : **public** = sans jeton ; **connecté** = `CONDUCTEUR` ou `EXPLOITANT` ; sinon le rôle exigé.
+Mots de passe : hachés en **Argon2id** (format PHC `$argon2id$v=19$m=19456,t=2,p=1$…`, paramètres OWASP).
+
+Colonne « Rôle » des tableaux : **public** = sans jeton ; **connecté** = `DRIVER` ou `OPERATOR` ; sinon le rôle exigé.
 
 ### 2.3 Vue d'ensemble des routes
 
 | Méthode | Chemin | Rôle | Objet | Sprint |
 |---|---|---|---|---|
-| GET | `/api/sante` | public | Le serveur répond (test de déploiement) | 1 |
-| POST | `/api/auth/inscription` | public | Créer un compte conducteur | 3 |
-| POST | `/api/auth/connexion` | public | Obtenir un JWT | 3 |
-| GET | `/api/auth/moi` | connecté | Mon profil et mes autorisations | 3 |
+| GET | `/api/health` | public | Le serveur répond (test de déploiement) | 1 |
+| GET | `/.well-known/jwks.json` | public | Clés publiques des JWT (2.2) | 4 |
+| POST | `/api/auth/register` | public | Créer un compte conducteur | 3 |
+| POST | `/api/auth/login` | public | Obtenir un JWT | 3 |
+| GET | `/api/auth/me` | connecté | Mon profil et mes autorisations | 3 |
 | GET | `/api/parking` | connecté | Plan : dimensions, places, zones, graphe (section 4) | 4 |
-| GET | `/api/places` | connecté | Toutes les places avec leur état | 4 |
-| GET | `/api/places/{id}` | connecté | Détail d'une place | 4 |
-| WS | `/api/ws/places?token=<jwt>` | connecté | Changements d'état en temps réel (1.4) | 4 |
-| POST | `/api/guidage` | CONDUCTEUR | Place libre la plus proche, trajet et verrouillage | 7–8 |
-| GET | `/api/guidage` | CONDUCTEUR | Mon guidage en cours | 8 |
-| DELETE | `/api/guidage` | CONDUCTEUR | Abandonner le guidage (libère le verrou) | 8 |
-| POST | `/api/guidage/arrivee` | CONDUCTEUR | Confirmer « Je suis garé » sur la place proposée | 8 |
-| POST | `/api/reservations` | CONDUCTEUR | Réserver une place | 6 |
+| GET | `/api/spots` | connecté | Toutes les places avec leur état | 4 |
+| GET | `/api/spots/{id}` | connecté | Détail d'une place | 4 |
+| WS | `/api/ws/spots?token=<jwt>` | connecté | Changements d'état en temps réel (1.4) | 4 |
+| POST | `/api/guidance` | DRIVER | Place libre la plus proche, trajet et verrouillage | 7–8 |
+| GET | `/api/guidance` | DRIVER | Mon guidage en cours | 8 |
+| DELETE | `/api/guidance` | DRIVER | Abandonner le guidage (libère le verrou) | 8 |
+| POST | `/api/guidance/arrival` | DRIVER | Confirmer « Je suis garé » sur la place proposée | 8 |
+| POST | `/api/reservations` | DRIVER | Réserver une place | 6 |
 | GET | `/api/reservations` | connecté | Mon historique (exploitant : toutes) | 6–7 |
 | GET | `/api/reservations/{id}` | connecté | Détail d'une réservation | 6 |
-| DELETE | `/api/reservations/{id}` | CONDUCTEUR | Annuler ma réservation | 6 |
-| POST | `/api/reservations/{id}/paiement` | CONDUCTEUR | Payer (simulé) | 7 |
-| GET | `/api/tableau-de-bord` | EXPLOITANT | Résumé, alertes non traitées, statut du Pi | 5 |
-| GET | `/api/evenements` | EXPLOITANT | Liste des anomalies | 8 |
-| PATCH | `/api/evenements/{id}` | EXPLOITANT | Marquer comme traitée | 8 |
-| GET, PUT | `/api/config/polygones` | EXPLOITANT | Fichier `places.json` (section 5.2) | 3 |
-| GET, PUT | `/api/config/plan` | EXPLOITANT | Plan et graphe (section 4) | 6 |
-| PATCH | `/api/config/places/{id}` | EXPLOITANT | Type et durée maximale d'une place | 6 |
-| GET, PATCH | `/api/config/parametres` | EXPLOITANT | Tarif et délais | 6 |
-| GET | `/api/utilisateurs` | EXPLOITANT | Liste des comptes | 6 |
-| POST | `/api/utilisateurs` | EXPLOITANT | Créer un compte (dont exploitant) | 6 |
-| PATCH | `/api/utilisateurs/{id}` | EXPLOITANT | Modifier, désactiver | 6 |
-| POST | `/api/utilisateurs/{id}/autorisations` | EXPLOITANT | Donner une autorisation PMR ou électrique | 6 |
-| DELETE | `/api/utilisateurs/{id}/autorisations/{aid}` | EXPLOITANT | Retirer une autorisation | 6 |
-| GET | `/api/stats` | EXPLOITANT | Statistiques | 9 |
-| GET | `/api/push/cle-publique` | public | Clé publique VAPID (1.5) | 9 |
-| POST | `/api/push/abonnements` | connecté | Enregistrer un abonnement (1.5) | 9 |
-| DELETE | `/api/push/abonnements` | connecté | Supprimer un abonnement (1.5) | 9 |
+| DELETE | `/api/reservations/{id}` | DRIVER | Annuler ma réservation | 6 |
+| POST | `/api/reservations/{id}/payment` | DRIVER | Payer (simulé) | 7 |
+| GET | `/api/dashboard` | OPERATOR | Résumé, alertes non traitées, statut du Pi | 5 |
+| GET | `/api/events` | OPERATOR | Liste des anomalies | 8 |
+| PATCH | `/api/events/{id}` | OPERATOR | Marquer comme traitée | 8 |
+| GET, PUT | `/api/config/polygons` | OPERATOR | Fichier `places.json` (section 5.2) | 3 |
+| GET, PUT | `/api/config/layout` | OPERATOR | Plan et graphe (section 4) | 6 |
+| PATCH | `/api/config/spots/{id}` | OPERATOR | Type et durée maximale d'une place | 6 |
+| GET, PATCH | `/api/config/settings` | OPERATOR | Tarif et délais | 6 |
+| GET | `/api/users` | OPERATOR | Liste des comptes | 6 |
+| POST | `/api/users` | OPERATOR | Créer un compte (dont exploitant) | 6 |
+| PATCH | `/api/users/{id}` | OPERATOR | Modifier, désactiver | 6 |
+| POST | `/api/users/{id}/permissions` | OPERATOR | Donner une autorisation PMR ou électrique | 6 |
+| DELETE | `/api/users/{id}/permissions/{pid}` | OPERATOR | Retirer une autorisation | 6 |
+| GET | `/api/stats` | OPERATOR | Statistiques | 9 |
+| GET | `/api/push/public-key` | public | Clé publique VAPID (1.5) | 9 |
+| POST | `/api/push/subscriptions` | connecté | Enregistrer un abonnement (1.5) | 9 |
+| DELETE | `/api/push/subscriptions` | connecté | Supprimer un abonnement (1.5) | 9 |
 
 ### 2.4 Santé
 
-**`GET /api/sante`** · public → `200`
+**`GET /api/health`** · public → `200`
 
 ```json
-{ "statut": "ok", "version": "0.1.0", "mongo": "ok", "mqtt": "ok", "ts": "2026-11-06T14:00:00Z" }
+{ "status": "ok", "version": "0.1.0", "mongo": "ok", "mqtt": "ok", "ts": "2026-11-06T14:00:00Z" }
 ```
 
 `mongo` et `mqtt` valent `ok` ou `ko`. Si l'un des deux vaut `ko`, la réponse est `503` avec le même corps. C'est la page de test du déploiement (sprint 1).
 
 ### 2.5 Authentification
 
-**`POST /api/auth/inscription`** · public
+**`POST /api/auth/register`** · public
 
 ```json
-{ "nom": "Sara Ben Ali", "email": "sara@exemple.tn", "mot_de_passe": "motdepasse8" }
+{ "name": "Sara Ben Ali", "email": "sara@exemple.tn", "password": "motdepasse8" }
 ```
 
 → `201`
 
 ```json
-{ "id": "u_6543a1f0", "nom": "Sara Ben Ali", "email": "sara@exemple.tn", "role": "CONDUCTEUR", "actif": true }
+{ "id": "u_6543a1f0", "name": "Sara Ben Ali", "email": "sara@exemple.tn", "role": "DRIVER", "active": true }
 ```
 
-Erreurs : `400 requete_invalide` (email invalide, mot de passe de moins de 8 caractères), `409 email_existant`.
-Le rôle est toujours `CONDUCTEUR` : un champ `role` envoyé ici est ignoré.
+Erreurs : `400 invalid_request` (email invalide, mot de passe de moins de 8 caractères), `409 email_already_exists`.
+Le rôle est toujours `DRIVER` : un champ `role` envoyé ici est ignoré.
 
-**`POST /api/auth/connexion`** · public
+**`POST /api/auth/login`** · public
 
 ```json
-{ "email": "sara@exemple.tn", "mot_de_passe": "motdepasse8" }
+{ "email": "sara@exemple.tn", "password": "motdepasse8" }
 ```
 
 → `200`
 
 ```json
 {
-  "jeton": "eyJhbGciOiJSUzI1NiIs...",
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",
   "type": "Bearer",
-  "expire_dans": 3600,
-  "utilisateur": { "id": "u_6543a1f0", "nom": "Sara Ben Ali", "email": "sara@exemple.tn", "role": "CONDUCTEUR" }
+  "expires_in": 3600,
+  "user": { "id": "u_6543a1f0", "name": "Sara Ben Ali", "email": "sara@exemple.tn", "role": "DRIVER" }
 }
 ```
 
-Erreurs : `401 identifiants_invalides` (même message que l'email ou le mot de passe soit faux), `403 compte_desactive`.
+Erreurs : `401 invalid_credentials` (même message que l'email ou le mot de passe soit faux), `403 account_disabled`.
 
-**`GET /api/auth/moi`** · connecté → `200`
+**`GET /api/auth/me`** · connecté → `200`
 
 ```json
 {
-  "id": "u_6543a1f0", "nom": "Sara Ben Ali", "email": "sara@exemple.tn", "role": "CONDUCTEUR",
-  "autorisations": [ { "id": "aut_11", "type": "pmr", "fin": null } ]
+  "id": "u_6543a1f0", "name": "Sara Ben Ali", "email": "sara@exemple.tn", "role": "DRIVER",
+  "permissions": [ { "id": "perm_11", "type": "accessible", "end": null } ]
 }
 ```
 
@@ -271,73 +277,73 @@ Erreurs : `401 identifiants_invalides` (même message que l'email ou le mot de p
 
 **`GET /api/parking`** · connecté → `200` : le JSON du plan décrit en **4.3** (dimensions, places, zones, graphe). La PWA s'en sert pour dessiner le plan SVG et le trajet.
 
-**`GET /api/places`** · connecté → `200`
+**`GET /api/spots`** · connecté → `200`
 
 ```json
 {
   "parking": "P1",
   "ts": "2026-11-20T10:05:00Z",
-  "resume": { "total": 8, "libres": 5, "occupees": 2, "reservees": 1 },
-  "places": [
-    { "id": "A1", "type": "pmr",        "etat": "libre",    "depuis": "2026-11-20T08:00:00Z", "duree_max_min": 120 },
-    { "id": "A2", "type": "normale",    "etat": "occupee",  "depuis": "2026-11-20T10:02:11Z", "duree_max_min": 120 },
-    { "id": "B4", "type": "electrique", "etat": "reservee", "depuis": "2026-11-20T09:58:40Z", "duree_max_min": 60 }
+  "summary": { "total": 8, "free": 5, "occupied": 2, "reserved": 1 },
+  "spots": [
+    { "id": "A1", "type": "accessible",        "state": "free",    "since": "2026-11-20T08:00:00Z", "max_duration_min": 120 },
+    { "id": "A2", "type": "standard",    "state": "occupied",  "since": "2026-11-20T10:02:11Z", "max_duration_min": 120 },
+    { "id": "B4", "type": "electric", "state": "reserved", "since": "2026-11-20T09:58:40Z", "max_duration_min": 60 }
   ]
 }
 ```
 
-- `etat` : `libre`, `occupee` ou `reservee`. **Le serveur calcule `reservee`** (réponse à la question 4 de 1.8) : une place libre avec une réservation active est renvoyée `reservee`. Le Pi, lui, ne connaît que `libre` et `occupee`.
-- Une place **verrouillée par le guidage** reste affichée `libre` (elle l'est réellement) ; elle n'est simplement pas proposée à un autre conducteur.
+- `state` : `free`, `occupied` ou `reserved`. **Le serveur calcule `reserved`** (réponse à la question 4 de 1.8) : une place libre avec une réservation active est renvoyée `reserved`. Le Pi, lui, ne connaît que `free` et `occupied`.
+- Une place **verrouillée par le guidage** reste affichée `free` (elle l'est réellement) ; elle n'est simplement pas proposée à un autre conducteur.
 
-**`GET /api/places/{id}`** · connecté → `200` : les mêmes champs, plus `depassement` (booléen, durée maximale dépassée) et, pour l'exploitant seulement, `verrou` (`null` ou `{"jusqu_a": "..."}`). Erreur : `404 introuvable`.
+**`GET /api/spots/{id}`** · connecté → `200` : les mêmes champs, plus `overdue` (booléen, durée maximale dépassée) et, pour l'exploitant seulement, `lock` (`null` ou `{"until": "..."}`). Erreur : `404 not_found`.
 
-**WebSocket `/api/ws/places?token=<jwt>`** : format défini en 1.4. Il envoie aussi l'état `reservee`.
+**WebSocket `/api/ws/spots?token=<jwt>`** : format défini en 1.4. Il envoie aussi l'état `reserved`.
 
 > **Proposition d'ajout (à valider par Eya)** : les exploitants reçoivent en plus, sur le même WebSocket, des messages avec un champ `type`. Un message **sans** `type` reste un changement de place (format de 1.4, inchangé).
 >
 > ```json
-> { "type": "evenement", "evenement": { "id": "evt_8f3a", "type": "cheval", "places": ["A3", "A4"], "debut": "2026-11-20T10:02:11Z" } }
-> { "type": "pi_statut", "en_ligne": true, "fps": 0.8, "temp_cpu": 61, "recu_le": "2026-11-20T10:05:00Z" }
+> { "type": "event", "event": { "id": "evt_8f3a", "type": "straddling", "spots": ["A3", "A4"], "start": "2026-11-20T10:02:11Z" } }
+> { "type": "pi_status", "online": true, "fps": 0.8, "cpu_temp": 61, "received_at": "2026-11-20T10:05:00Z" }
 > ```
 
 ### 2.7 Guidage
 
-**`POST /api/guidage`** · CONDUCTEUR
+**`POST /api/guidance`** · DRIVER
 
 ```json
-{ "depart": "E" }
+{ "from": "E" }
 ```
 
-Le corps est facultatif (`depart` vaut `E`, l'entrée, par défaut).
+Le corps est facultatif (`from` vaut `E`, l'entrée, par défaut).
 
 → `200`
 
 ```json
 {
-  "place": "A2",
+  "spot": "A2",
   "distance_cm": 39.5,
-  "trajet": ["E", "I1", "I2", "A2"],
-  "verrou_jusqu_a": "2026-11-20T10:08:00Z"
+  "path": ["E", "I1", "I2", "A2"],
+  "locked_until": "2026-11-20T10:08:00Z"
 }
 ```
 
 Règles :
-- Plus court chemin (Dijkstra) dans le graphe de la section 4, vers les places `libre`, non verrouillées par un autre conducteur et non réservées.
-- Places `pmr` ou `electrique` : proposées seulement si le conducteur a l'autorisation correspondante, valide.
+- Plus court chemin (Dijkstra) dans le graphe de la section 4, vers les places `free`, non verrouillées par un autre conducteur et non réservées.
+- Places `accessible` ou `electric` : proposées seulement si le conducteur a l'autorisation correspondante, valide.
 - À égalité de distance, l'identifiant le plus petit dans l'ordre alphabétique gagne (`A1` avant `B1`).
-- La place est **verrouillée 3 minutes** (paramètre `verrou_min`). Un conducteur n'a qu'un verrou : un nouvel appel pendant le verrou renvoie la même place.
-- Le verrou disparaît à l'expiration, par `DELETE /api/guidage`, ou quand l'arrivée du conducteur est confirmée (voir ci-dessous).
+- La place est **verrouillée 3 minutes** (paramètre `lock_min`). Un conducteur n'a qu'un verrou : un nouvel appel pendant le verrou renvoie la même place.
+- Le verrou disparaît à l'expiration, par `DELETE /api/guidance`, ou quand l'arrivée du conducteur est confirmée (voir ci-dessous).
 
-**Confirmation d'arrivée** (décision d'équipe du 16 novembre 2026). La caméra ne reconnaît ni plaques ni visages : quand la place verrouillée devient `occupee`, le serveur ne sait pas **qui** s'est garé. C'est donc le conducteur qui le confirme, avec le bouton « Je suis garé » de la PWA (`POST /api/guidage/arrivee`).
-- **Arrivée confirmée** : si la place devient `occupee` et que le conducteur confirme, dans un sens ou dans l'autre, à moins de `confirmation_arrivee_s` secondes d'écart (60 par défaut), le guidage est terminé et le verrou supprimé.
-- **Pas de confirmation** : si la place devient `occupee` et que le conducteur ne confirme pas dans les `confirmation_arrivee_s` secondes, le serveur considère que **quelqu'un d'autre** a pris la place : il calcule un nouveau trajet, verrouille la nouvelle place et envoie la notification `place_prise` (section 3).
-- **Confirmation sans occupation** : si le conducteur confirme mais que la place reste `libre`, rien ne change ; le verrou expire normalement (le conducteur s'est peut-être garé ailleurs).
+**Confirmation d'arrivée** (décision d'équipe du 16 novembre 2026). La caméra ne reconnaît ni plaques ni visages : quand la place verrouillée devient `occupied`, le serveur ne sait pas **qui** s'est garé. C'est donc le conducteur qui le confirme, avec le bouton « Je suis garé » de la PWA (`POST /api/guidance/arrival`).
+- **Arrivée confirmée** : si la place devient `occupied` et que le conducteur confirme, dans un sens ou dans l'autre, à moins de `arrival_confirmation_s` secondes d'écart (60 par défaut), le guidage est terminé et le verrou supprimé.
+- **Pas de confirmation** : si la place devient `occupied` et que le conducteur ne confirme pas dans les `arrival_confirmation_s` secondes, le serveur considère que **quelqu'un d'autre** a pris la place : il calcule un nouveau trajet, verrouille la nouvelle place et envoie la notification `spot_taken` (section 3).
+- **Confirmation sans occupation** : si le conducteur confirme mais que la place reste `free`, rien ne change ; le verrou expire normalement (le conducteur s'est peut-être garé ailleurs).
 
-Erreurs : `409 parking_complet` (aucune place possible pour ce conducteur), `400 requete_invalide` (`depart` inconnu).
+Erreurs : `409 parking_full` (aucune place possible pour ce conducteur), `400 invalid_request` (`from` inconnu).
 
-**`GET /api/guidage`** · CONDUCTEUR → `200` avec le même corps, ou `404 introuvable` s'il n'y a pas de guidage en cours.
-**`DELETE /api/guidage`** · CONDUCTEUR → `204`.
-**`POST /api/guidage/arrivee`** · CONDUCTEUR (corps vide) → `200` `{ "place": "A2", "confirme_le": "2026-11-20T10:06:30Z" }`. Erreur : `404 introuvable` s'il n'y a pas de guidage en cours.
+**`GET /api/guidance`** · DRIVER → `200` avec le même corps, ou `404 not_found` s'il n'y a pas de guidage en cours.
+**`DELETE /api/guidance`** · DRIVER → `204`.
+**`POST /api/guidance/arrival`** · DRIVER (corps vide) → `200` `{ "spot": "A2", "confirmed_at": "2026-11-20T10:06:30Z" }`. Erreur : `404 not_found` s'il n'y a pas de guidage en cours.
 
 ### 2.8 Réservations et paiement simulé
 
@@ -350,189 +356,189 @@ active ──(la voiture arrive : place occupee)──▶ en_cours ──(la voi
   └──(15 min sans arrivée)──▶ expiree
 ```
 
-**`POST /api/reservations`** · CONDUCTEUR
+**`POST /api/reservations`** · DRIVER
 
 ```json
-{ "place": "B2" }
+{ "spot": "B2" }
 ```
 
 → `201`
 
 ```json
 {
-  "id": "r_7c21", "place": "B2", "etat": "active",
-  "creee_le": "2026-11-20T09:58:40Z", "expire_le": "2026-11-20T10:13:40Z",
-  "debut": null, "fin": null, "montant": null, "paiement": null
+  "id": "r_7c21", "spot": "B2", "state": "active",
+  "created_at": "2026-11-20T09:58:40Z", "expires_at": "2026-11-20T10:13:40Z",
+  "start": null, "end": null, "amount": null, "payment": null
 }
 ```
 
-Erreurs : `409 place_indisponible` (place pas libre, ou verrouillée pour un autre conducteur), `409 reservation_deja_active` (une seule réservation `active` ou `en_cours` par conducteur), `403 autorisation_requise` (place PMR ou électrique sans autorisation), `404 introuvable` (place inconnue).
+Erreurs : `409 spot_unavailable` (place pas libre, ou verrouillée pour un autre conducteur), `409 reservation_already_active` (une seule réservation `active` ou `in_progress` par conducteur), `403 permission_required` (place PMR ou électrique sans autorisation), `404 not_found` (place inconnue).
 
-**`GET /api/reservations?etat=payee&limite=20`** · connecté → `200` : liste du plus récent au plus ancien, objets au format ci-dessus. Le conducteur ne voit que les siennes ; l'exploitant voit toutes, filtrables avec `utilisateur=u_…`. Paramètres facultatifs : `etat`, `limite` (20 par défaut, 100 au plus).
+**`GET /api/reservations?state=paid&limit=20`** · connecté → `200` : liste du plus récent au plus ancien, objets au format ci-dessus. Le conducteur ne voit que les siennes ; l'exploitant voit toutes, filtrables avec `user=u_…`. Paramètres facultatifs : `state`, `limit` (20 par défaut, 100 au plus).
 
-**`GET /api/reservations/{id}`** · connecté → `200`. Erreur : `404 introuvable` (y compris pour la réservation d'un autre conducteur, pour ne pas révéler qu'elle existe).
+**`GET /api/reservations/{id}`** · connecté → `200`. Erreur : `404 not_found` (y compris pour la réservation d'un autre conducteur, pour ne pas révéler qu'elle existe).
 
-**`DELETE /api/reservations/{id}`** · CONDUCTEUR → `200` avec la réservation à l'état `annulee`. Elle reste dans l'historique. Erreurs : `404 introuvable`, `409 annulation_impossible` (état autre que `active`).
+**`DELETE /api/reservations/{id}`** · DRIVER → `200` avec la réservation à l'état `cancelled`. Elle reste dans l'historique. Erreurs : `404 not_found`, `409 cancellation_not_allowed` (état autre que `active`).
 
-**`POST /api/reservations/{id}/paiement`** · CONDUCTEUR
+**`POST /api/reservations/{id}/payment`** · DRIVER
 
 ```json
-{ "moyen": "simule" }
+{ "method": "simulated" }
 ```
 
 → `200`
 
 ```json
 {
-  "id": "r_7c21", "place": "B2", "etat": "payee",
-  "debut": "2026-11-20T10:01:05Z", "fin": "2026-11-20T11:20:30Z",
-  "montant": 2.25, "devise": "TND",
-  "paiement": { "moyen": "simule", "paye_le": "2026-11-20T11:21:00Z", "recu": "RECU-2026-000042" }
+  "id": "r_7c21", "spot": "B2", "state": "paid",
+  "start": "2026-11-20T10:01:05Z", "end": "2026-11-20T11:20:30Z",
+  "amount": 2.25, "currency": "TND",
+  "payment": { "method": "simulated", "paid_at": "2026-11-20T11:21:00Z", "receipt": "RECU-2026-000042" }
 }
 ```
 
-- Montant = `tarif_horaire` × durée arrondie au quart d'heure supérieur (1 quart d'heure au minimum). Si la voiture est encore là (`en_cours`), la durée va jusqu'au moment du paiement.
-- **Paiement simulé** : aucune donnée bancaire n'est demandée ni stockée ; `moyen` vaut toujours `simule`.
+- Montant = `hourly_rate` × durée arrondie au quart d'heure supérieur (1 quart d'heure au minimum). Si la voiture est encore là (`in_progress`), la durée va jusqu'au moment du paiement.
+- **Paiement simulé** : aucune donnée bancaire n'est demandée ni stockée ; `method` vaut toujours `simulated`.
 
-Erreurs : `409 deja_payee`, `409 paiement_impossible` (état `active`, `annulee` ou `expiree`).
+Erreurs : `409 already_paid`, `409 payment_not_allowed` (état `active`, `cancelled` ou `expired`).
 
 ### 2.9 Exploitant : tableau de bord et événements
 
-**`GET /api/tableau-de-bord`** · EXPLOITANT → `200`
+**`GET /api/dashboard`** · OPERATOR → `200`
 
 ```json
 {
   "ts": "2026-11-20T10:05:00Z",
-  "resume": { "total": 8, "libres": 5, "occupees": 2, "reservees": 1 },
-  "taux_occupation": 0.375,
-  "alertes_non_traitees": 2,
-  "pi": { "en_ligne": true, "fps": 0.8, "temp_cpu": 61, "recu_le": "2026-11-20T10:04:12Z" }
+  "summary": { "total": 8, "free": 5, "occupied": 2, "reserved": 1 },
+  "occupancy_rate": 0.375,
+  "unhandled_alerts": 2,
+  "pi": { "online": true, "fps": 0.8, "cpu_temp": 61, "received_at": "2026-11-20T10:04:12Z" }
 }
 ```
 
-`taux_occupation` = (occupées + réservées) / total. Le Pi est affiché `en_ligne: false` s'il n'a rien envoyé depuis 3 minutes (paramètre `pi_hors_ligne_min`).
+`occupancy_rate` = (occupées + réservées) / total. Le Pi est affiché `online: false` s'il n'a rien envoyé depuis 3 minutes (paramètre `pi_offline_min`).
 
-**`GET /api/evenements?traite=false&type=cheval&du=2026-11-20&au=2026-11-21&limite=50`** · EXPLOITANT → `200` (tous les paramètres sont facultatifs ; tri du plus récent au plus ancien)
+**`GET /api/events?handled=false&type=straddling&from=2026-11-20&to=2026-11-21&limit=50`** · OPERATOR → `200` (tous les paramètres sont facultatifs ; tri du plus récent au plus ancien)
 
 ```json
 [
   {
-    "id": "evt_8f3a", "type": "cheval", "places": ["A3", "A4"], "zone": null,
-    "debut": "2026-11-20T10:02:11Z", "fin": null, "source": "pi",
-    "traite": false, "traite_par": null, "traite_le": null, "commentaire": null
+    "id": "evt_8f3a", "type": "straddling", "spots": ["A3", "A4"], "zone": null,
+    "start": "2026-11-20T10:02:11Z", "end": null, "source": "pi",
+    "handled": false, "handled_by": null, "handled_at": null, "comment": null
   },
   {
-    "id": "evt_8f40", "type": "ventouse", "places": ["A2"], "zone": null,
-    "debut": "2026-11-20T12:02:11Z", "fin": null, "source": "serveur",
-    "details": { "duree_min": 121, "duree_max_min": 120 },
-    "traite": false, "traite_par": null, "traite_le": null, "commentaire": null
+    "id": "evt_8f40", "type": "overstay", "spots": ["A2"], "zone": null,
+    "start": "2026-11-20T12:02:11Z", "end": null, "source": "server",
+    "details": { "duration_min": 121, "max_duration_min": 120 },
+    "handled": false, "handled_by": null, "handled_at": null, "comment": null
   }
 ]
 ```
 
-- `type` : `cheval`, `zone_interdite` (envoyés par le Pi), `ventouse`, `place_speciale` (calculés par le serveur).
-- `fin` est rempli quand le serveur sait que l'anomalie est finie (la place redevient libre) ; sinon `null`.
+- `type` : `straddling`, `forbidden_zone` (envoyés par le Pi), `overstay`, `unauthorized_special_spot` (calculés par le serveur).
+- `end` est rempli quand le serveur sait que l'anomalie est finie (la place redevient libre) ; sinon `null`.
 
-**`PATCH /api/evenements/{id}`** · EXPLOITANT
+**`PATCH /api/events/{id}`** · OPERATOR
 
 ```json
-{ "traite": true, "commentaire": "Conducteur prévenu" }
+{ "handled": true, "comment": "Conducteur prévenu" }
 ```
 
-→ `200` avec l'événement mis à jour (`traite_par`, `traite_le` remplis par le serveur). Erreur : `404 introuvable`.
+→ `200` avec l'événement mis à jour (`handled_by`, `handled_at` remplis par le serveur). Erreur : `404 not_found`.
 
 ### 2.10 Exploitant : configuration
 
-**`GET /api/config/polygones`** → `200` : le fichier `places.json` au format de **5.2**.
-**`PUT /api/config/polygones`** : corps = ce même fichier, en entier. → `200` avec le fichier enregistré. Le serveur le publie au Pi sur `parking/P1/config` (proposition 5.3), pour que le Pi le reçoive sans redémarrage.
-Erreur `400 config_invalide` si : identifiant en double, polygone de moins de 3 points ou en dehors de `resolution`, `type` inconnu, `duree_max_min` ≤ 0, place absente du plan.
+**`GET /api/config/polygons`** → `200` : le fichier `places.json` au format de **5.2**.
+**`PUT /api/config/polygons`** : corps = ce même fichier, en entier. → `200` avec le fichier enregistré. Le serveur le publie au Pi sur `parking/P1/config` (proposition 5.3), pour que le Pi le reçoive sans redémarrage.
+Erreur `400 invalid_config` si : identifiant en double, polygone de moins de 3 points ou en dehors de `resolution`, `type` inconnu, `max_duration_min` ≤ 0, place absente du plan.
 
-**`GET /api/config/plan`** → `200` : JSON de **4.3**. **`PUT /api/config/plan`** : corps = ce JSON. Erreur `400 config_invalide` si le graphe n'est pas connexe, si une place n'a pas de nœud ou si le nœud `E` manque.
+**`GET /api/config/layout`** → `200` : JSON de **4.3**. **`PUT /api/config/layout`** : corps = ce JSON. Erreur `400 invalid_config` si le graphe n'est pas connexe, si une place n'a pas de nœud ou si le nœud `E` manque.
 
-**`PATCH /api/config/places/{id}`**
+**`PATCH /api/config/spots/{id}`**
 
 ```json
-{ "type": "electrique", "duree_max_min": 60 }
+{ "type": "electric", "max_duration_min": 60 }
 ```
 
 → `200` avec la place. Les deux champs sont facultatifs. Le changement est aussi republié au Pi.
 
-**`GET /api/config/parametres`** → `200`. **`PATCH /api/config/parametres`** : un ou plusieurs champs → `200`.
+**`GET /api/config/settings`** → `200`. **`PATCH /api/config/settings`** : un ou plusieurs champs → `200`.
 
 ```json
 {
-  "tarif_horaire": 1.5, "devise": "TND",
-  "verrou_min": 3, "confirmation_arrivee_s": 60, "delai_reservation_min": 15,
-  "preavis_fin_duree_min": 10, "pi_hors_ligne_min": 3
+  "hourly_rate": 1.5, "currency": "TND",
+  "lock_min": 3, "arrival_confirmation_s": 60, "reservation_timeout_min": 15,
+  "end_warning_min": 10, "pi_offline_min": 3
 }
 ```
 
 ### 2.11 Exploitant : utilisateurs et autorisations
 
-**`GET /api/utilisateurs?role=CONDUCTEUR&actif=true`** → `200`
+**`GET /api/users?role=DRIVER&active=true`** → `200`
 
 ```json
 [
   {
-    "id": "u_6543a1f0", "nom": "Sara Ben Ali", "email": "sara@exemple.tn",
-    "role": "CONDUCTEUR", "actif": true, "cree_le": "2026-11-18T09:00:00Z",
-    "autorisations": [ { "id": "aut_11", "type": "pmr", "debut": "2026-11-18", "fin": null } ]
+    "id": "u_6543a1f0", "name": "Sara Ben Ali", "email": "sara@exemple.tn",
+    "role": "DRIVER", "active": true, "created_at": "2026-11-18T09:00:00Z",
+    "permissions": [ { "id": "perm_11", "type": "accessible", "start": "2026-11-18", "end": null } ]
   }
 ]
 ```
 
 Le mot de passe (même haché) n'est jamais renvoyé.
 
-**`POST /api/utilisateurs`**
+**`POST /api/users`**
 
 ```json
-{ "nom": "Agent Accueil", "email": "agent@exemple.tn", "mot_de_passe": "motdepasse8", "role": "EXPLOITANT" }
+{ "name": "Agent Accueil", "email": "agent@exemple.tn", "password": "motdepasse8", "role": "OPERATOR" }
 ```
 
-→ `201` avec l'utilisateur. Erreurs : `409 email_existant`, `400 requete_invalide`.
+→ `201` avec l'utilisateur. Erreurs : `409 email_already_exists`, `400 invalid_request`.
 
-**`PATCH /api/utilisateurs/{id}`**
+**`PATCH /api/users/{id}`**
 
 ```json
-{ "actif": false }
+{ "active": false }
 ```
 
-Champs possibles : `nom`, `role`, `actif`. → `200`. Un compte désactivé ne peut plus se connecter, et ses jetons en cours sont refusés. Erreur : `409 action_interdite` (un exploitant ne peut pas se désactiver lui-même ni retirer son propre rôle).
+Champs possibles : `name`, `role`, `active`. → `200`. Un compte désactivé ne peut plus se connecter, et ses jetons en cours sont refusés. Erreur : `409 action_not_allowed` (un exploitant ne peut pas se désactiver lui-même ni retirer son propre rôle).
 
-**`POST /api/utilisateurs/{id}/autorisations`**
+**`POST /api/users/{id}/permissions`**
 
 ```json
-{ "type": "pmr", "fin": "2027-06-30" }
+{ "type": "accessible", "end": "2027-06-30" }
 ```
 
-`type` : `pmr` ou `electrique` ; `fin` facultatif (`null` = sans fin). → `201` avec l'autorisation. Erreur : `409 autorisation_existante`.
+`type` : `accessible` ou `electric` ; `end` facultatif (`null` = sans fin). → `201` avec l'autorisation. Erreur : `409 permission_already_exists`.
 
-**`DELETE /api/utilisateurs/{id}/autorisations/{aid}`** → `204`.
+**`DELETE /api/users/{id}/permissions/{pid}`** → `204`.
 
 ### 2.12 Statistiques
 
-**`GET /api/stats?du=2026-11-20&au=2026-11-26&granularite=jour`** · EXPLOITANT → `200`
+**`GET /api/stats?from=2026-11-20&to=2026-11-26&granularity=day`** · OPERATOR → `200`
 
-`granularite` : `heure` ou `jour`. Par défaut, les 7 derniers jours, par jour.
+`granularity` : `hour` ou `day`. Par défaut, les 7 derniers jours, par jour.
 
 ```json
 {
-  "du": "2026-11-20", "au": "2026-11-26", "granularite": "jour",
-  "taux_occupation_moyen": 0.63,
-  "duree_moyenne_min": 47,
-  "occupation": [ { "debut": "2026-11-20T00:00:00Z", "taux": 0.58 }, { "debut": "2026-11-21T00:00:00Z", "taux": 0.66 } ],
-  "heures_de_pointe": [ { "heure": 10, "taux": 0.91 }, { "heure": 17, "taux": 0.86 } ],
-  "par_place": [ { "place": "A1", "taux": 0.32, "duree_moyenne_min": 38 } ],
-  "infractions": { "cheval": 4, "ventouse": 2, "place_speciale": 1, "zone_interdite": 3 }
+  "from": "2026-11-20", "to": "2026-11-26", "granularity": "day",
+  "average_occupancy_rate": 0.63,
+  "average_duration_min": 47,
+  "occupancy": [ { "start": "2026-11-20T00:00:00Z", "rate": 0.58 }, { "start": "2026-11-21T00:00:00Z", "rate": 0.66 } ],
+  "peak_hours": [ { "hour": 10, "rate": 0.91 }, { "hour": 17, "rate": 0.86 } ],
+  "per_spot": [ { "spot": "A1", "rate": 0.32, "average_duration_min": 38 } ],
+  "violations": { "straddling": 4, "overstay": 2, "unauthorized_special_spot": 1, "forbidden_zone": 3 }
 }
 ```
 
-Agrégations MongoDB sur `historique_occupation` et `evenements`. Aucune donnée personnelle dans la réponse.
-Erreur : `400 requete_invalide` (`du` après `au`, période de plus de 92 jours).
+Agrégations MongoDB sur `occupancy_history` et `events`. Aucune donnée personnelle dans la réponse.
+Erreur : `400 invalid_request` (`from` après `to`, période de plus de 92 jours).
 
 ### 2.13 Notifications push
 
-Routes définies par Eya en **1.5**, reprises sans changement : `GET /api/push/cle-publique`, `POST /api/push/abonnements` (`201` à la création, `200` si l'`endpoint` existe déjà), `DELETE /api/push/abonnements` (`204`). Contenu des messages : section 3.
+Routes définies par Eya en **1.5**, reprises sans changement : `GET /api/push/public-key`, `POST /api/push/subscriptions` (`201` à la création, `200` si l'`endpoint` existe déjà), `DELETE /api/push/subscriptions` (`204`). Contenu des messages : section 3.
 
 ### 2.14 Collections MongoDB
 
@@ -540,14 +546,14 @@ Base `smartparking`. Les champs `_id` en texte (`"A1"`, `"P1"`) sont choisis par
 
 | Collection | Champs | Index |
 |---|---|---|
-| `parkings` | `_id` (`"P1"`), `nom`, `resolution` `[l, h]`, `dimensions_cm` `[l, h]`, `graphe` `{noeuds, aretes}` (4.3), `zones_interdites` `[{id, poly, rect_cm}]`, `parametres` (2.10), `pi` `{en_ligne, fps, temp_cpu, recu_le}`, `maj_le` | — |
-| `places` | `_id` (`"A1"`), `parking`, `type`, `duree_max_min`, `poly` (pixels, 5.2), `rect_cm` (plan, 4.3), `noeud`, `etat` (`libre`/`occupee`, venant du Pi), `depuis`, `verrou` `{utilisateur, jusqu_a, confirme_le}` ou `null` | `parking` |
-| `utilisateurs` | `_id`, `nom`, `email`, `mot_de_passe_hash` (PBKDF2 ou bcrypt), `role`, `actif`, `cree_le` | `email` unique |
-| `autorisations` | `_id`, `utilisateur`, `type` (`pmr`/`electrique`), `debut`, `fin`, `accordee_par` | `utilisateur` + `type` |
-| `reservations` | `_id`, `utilisateur`, `place`, `etat`, `creee_le`, `expire_le`, `debut`, `fin`, `montant`, `devise`, `paiement` `{moyen, paye_le, recu}` | `utilisateur` + `creee_le`, `place` + `etat` |
-| `evenements` | `_id`, `parking`, `type`, `places`, `zone`, `debut`, `fin`, `source` (`pi`/`serveur`), `details`, `traite`, `traite_par`, `traite_le`, `commentaire` | `traite` + `debut`, `type` + `debut` |
-| `abonnements_push` | `_id`, `utilisateur`, `endpoint`, `cles` `{p256dh, auth}`, `cree_le` | `endpoint` unique, `utilisateur` |
-| `historique_occupation` | `_id`, `place`, `debut`, `fin`, `duree_min` (un document par stationnement terminé, pour `/stats`) | `place` + `debut` |
+| `parkings` | `_id` (`"P1"`), `name`, `resolution` `[l, h]`, `dimensions_cm` `[l, h]`, `graph` `{nodes, edges}` (4.3), `forbidden_zones` `[{id, polygon, rect_cm}]`, `settings` (2.10), `pi` `{online, fps, cpu_temp, received_at}`, `updated_at` | — |
+| `spots` | `_id` (`"A1"`), `parking`, `type`, `max_duration_min`, `polygon` (pixels, 5.2), `rect_cm` (plan, 4.3), `node`, `state` (`free`/`occupied`, venant du Pi), `since`, `lock` `{user, until, confirmed_at}` ou `null` | `parking` |
+| `users` | `_id`, `name`, `email`, `password_hash` (Argon2id), `role`, `active`, `created_at` | `email` unique |
+| `permissions` | `_id`, `user`, `type` (`accessible`/`electric`), `start`, `end`, `granted_by` | `user` + `type` |
+| `reservations` | `_id`, `user`, `spot`, `state`, `created_at`, `expires_at`, `start`, `end`, `amount`, `currency`, `payment` `{method, paid_at, receipt}` | `user` + `created_at`, `spot` + `state` |
+| `events` | `_id`, `parking`, `type`, `spots`, `zone`, `start`, `end`, `source` (`pi`/`server`), `details`, `handled`, `handled_by`, `handled_at`, `comment` | `handled` + `start`, `type` + `start` |
+| `push_subscriptions` | `_id`, `user`, `endpoint`, `keys` `{p256dh, auth}`, `created_at` | `endpoint` unique, `user` |
+| `occupancy_history` | `_id`, `spot`, `start`, `end`, `duration_min` (un document par stationnement terminé, pour `/stats`) | `spot` + `start` |
 
 Aucune collection ne contient d'image, de plaque ou de visage (privacy by design) : uniquement des états, des horaires et des comptes.
 
@@ -563,50 +569,50 @@ Les routes et le format général sont ceux de **1.5** (Eya). Cette section fixe
 
 ```json
 {
-  "type": "reservation_confirmee",
-  "titre": "Réservation confirmée",
-  "corps": "La place B2 vous est réservée jusqu'à 10:13.",
+  "type": "reservation_confirmed",
+  "title": "Réservation confirmée",
+  "body": "La place B2 vous est réservée jusqu'à 10:13.",
   "url": "/conducteur#reservations",
   "ts": "2026-11-20T09:58:40Z",
   "id": "r_7c21-confirmee",
-  "donnees": { "reservation": "r_7c21", "place": "B2" }
+  "data": { "reservation": "r_7c21", "spot": "B2" }
 }
 ```
 
 | Champ | Obligatoire | Contenu |
 |---|---|---|
 | `type` | oui | Un des types de 3.2 |
-| `titre` | oui | Titre court (40 caractères au plus) |
-| `corps` | oui | Le message affiché (120 caractères au plus) |
+| `title` | oui | Titre court (40 caractères au plus) |
+| `body` | oui | Le message affiché (120 caractères au plus) |
 | `url` | oui | Chemin relatif dans la PWA, ouvert au clic |
 | `ts` | oui | Date de l'événement, ISO 8601 UTC |
 | `id` | oui | Identifiant unique : une notification avec le même `id` remplace la précédente |
-| `donnees` | non | Données utiles à la page ouverte |
+| `data` | non | Données utiles à la page ouverte |
 
-> Le champ du texte s'appelle **`corps`** (nom choisi par Eya, déjà utilisé dans la PWA) ; c'est le « message » de la notification.
+> Le champ du texte s'appelle **`body`** (nom choisi par Eya, déjà utilisé dans la PWA) ; c'est le « message » de la notification.
 
 ### 3.2 Types, destinataires et textes
 
-| `type` | Destinataire | Déclenché quand | `titre` / `corps` (exemple) | `url` | `donnees` |
+| `type` | Destinataire | Déclenché quand | `title` / `body` (exemple) | `url` | `data` |
 |---|---|---|---|---|---|
-| `reservation_confirmee` | conducteur concerné | `POST /api/reservations` réussi | « Réservation confirmée » / « La place B2 vous est réservée jusqu'à 10:13. » | `/conducteur#reservations` | `reservation`, `place` |
-| `fin_duree` | conducteur concerné | 10 min avant la fin de la durée maximale | « Fin de stationnement proche » / « Il vous reste 10 minutes sur la place B2. » | `/conducteur#reservations` | `reservation`, `place`, `fin_prevue` |
-| `place_a_liberer` | conducteur concerné | durée maximale dépassée | « Place à libérer » / « Votre durée sur la place B2 est dépassée. » | `/conducteur#reservations` | `reservation`, `place` |
-| `place_prise` | conducteur guidé | sa place verrouillée devient occupée sans confirmation d'arrivée dans les `confirmation_arrivee_s` secondes (2.7) | « Place prise » / « A2 a été prise. Nouvelle place : A3. » | `/conducteur#guidage` | `ancienne_place`, `place`, `trajet` |
-| `cheval` | tous les exploitants | événement `cheval` reçu du Pi | « Voiture à cheval » / « Une voiture occupe les places A3 et A4. » | `/exploitant#alertes` | `evenement`, `places` |
-| `ventouse` | tous les exploitants | durée maximale dépassée | « Véhicule ventouse » / « A2 occupée depuis 2 h 01 (max 2 h). » | `/exploitant#alertes` | `evenement`, `places`, `duree_min` |
-| `place_speciale` | tous les exploitants | place PMR ou électrique occupée sans autorisation | « Place spéciale » / « La place PMR A1 est occupée sans autorisation. » | `/exploitant#alertes` | `evenement`, `places`, `type_place` |
-| `zone_interdite` | tous les exploitants | événement `zone_interdite` reçu du Pi | « Zone interdite » / « Un véhicule est arrêté dans allee1. » | `/exploitant#alertes` | `evenement`, `zone` |
+| `reservation_confirmed` | conducteur concerné | `POST /api/reservations` réussi | « Réservation confirmée » / « La place B2 vous est réservée jusqu'à 10:13. » | `/conducteur#reservations` | `reservation`, `spot` |
+| `time_almost_up` | conducteur concerné | 10 min avant la fin de la durée maximale | « Fin de stationnement proche » / « Il vous reste 10 minutes sur la place B2. » | `/conducteur#reservations` | `reservation`, `spot`, `expected_end` |
+| `spot_overdue` | conducteur concerné | durée maximale dépassée | « Place à libérer » / « Votre durée sur la place B2 est dépassée. » | `/conducteur#reservations` | `reservation`, `spot` |
+| `spot_taken` | conducteur guidé | sa place verrouillée devient occupée sans confirmation d'arrivée dans les `arrival_confirmation_s` secondes (2.7) | « Place prise » / « A2 a été prise. Nouvelle place : A3. » | `/conducteur#guidage` | `previous_spot`, `spot`, `path` |
+| `straddling` | tous les exploitants | événement `straddling` reçu du Pi | « Voiture à cheval » / « Une voiture occupe les places A3 et A4. » | `/exploitant#alertes` | `event`, `spots` |
+| `overstay` | tous les exploitants | durée maximale dépassée | « Véhicule ventouse » / « A2 occupée depuis 2 h 01 (max 2 h). » | `/exploitant#alertes` | `event`, `spots`, `duration_min` |
+| `unauthorized_special_spot` | tous les exploitants | place PMR ou électrique occupée sans autorisation | « Place spéciale » / « La place PMR A1 est occupée sans autorisation. » | `/exploitant#alertes` | `event`, `spots`, `spot_type` |
+| `forbidden_zone` | tous les exploitants | événement `forbidden_zone` reçu du Pi | « Zone interdite » / « Un véhicule est arrêté dans allee1. » | `/exploitant#alertes` | `event`, `zone` |
 
 Pour les quatre anomalies, `id` = l'identifiant de l'événement (`evt_…`).
 
 ### 3.3 Règles d'envoi (serveur)
 
 - **Une notification par événement**, jamais une par image analysée.
-- Réponses aux questions de 1.8 : le conducteur **ne reçoit pas** `ventouse` (il reçoit `place_a_liberer`) ; le préavis `fin_duree` est de **10 minutes** (paramètre `preavis_fin_duree_min`).
+- Réponses aux questions de 1.8 : le conducteur **ne reçoit pas** `overstay` (il reçoit `spot_overdue`) ; le préavis `time_almost_up` est de **10 minutes** (paramètre `end_warning_min`).
 - Anomalies : `Urgency: high`, `TTL` 1 heure. Messages conducteur : `Urgency: normal`, `TTL` 15 minutes (un message périmé n'a plus d'intérêt).
 - Si le service de push répond `404` ou `410`, l'abonnement est supprimé (1.5).
-- Clés VAPID dans les variables d'environnement `VAPID_CLE_PUBLIQUE`, `VAPID_CLE_PRIVEE` et `VAPID_SUJET` (sujet `mailto:` de l'équipe, question 3 de 1.8 : adresse à choisir ensemble). Jamais dans Git.
+- Clés VAPID dans les variables d'environnement `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` et `VAPID_SUBJECT` (sujet `mailto:` de l'équipe, question 3 de 1.8 : adresse à choisir ensemble). Jamais dans Git.
 - Pas de donnée personnelle dans le texte : ni nom, ni email, seulement des numéros de place.
 
 ---
@@ -643,7 +649,7 @@ Légende : `E` entrée, `S` sortie, `I1`…`I4` intersections de l'allée, `o` c
 - **Zone interdite `allee1`** : la fin de l'allée devant la sortie, `x` de 50 à 60, `y` de 13 à 27. On peut y rouler, pas s'y arrêter.
 - Les bandes `x` de 0 à 14 et de 46 à 60 au-dessus et au-dessous de l'allée sont des trottoirs (non stationnables).
 
-| Place | Type | `duree_max_min` | Rectangle `[x, y, largeur, hauteur]` (cm) | Nœud |
+| Place | Type | `max_duration_min` | Rectangle `[x, y, largeur, hauteur]` (cm) | Nœud |
 |---|---|---|---|---|
 | A1 | pmr | 120 | `[14, 0, 8, 13]` | `A1` |
 | A2 | normale | 120 | `[22, 0, 8, 13]` | `A2` |
@@ -654,7 +660,7 @@ Légende : `E` entrée, `S` sortie, `I1`…`I4` intersections de l'allée, `o` c
 | B3 | normale | 120 | `[30, 27, 8, 13]` | `B3` |
 | B4 | electrique | 60 | `[38, 27, 8, 13]` | `B4` |
 
-Pour la démo, l'exploitant pourra baisser `duree_max_min` à 2 minutes afin de montrer une alerte `ventouse` sans attendre.
+Pour la démo, l'exploitant pourra baisser `max_duration_min` à 2 minutes afin de montrer une alerte `overstay` sans attendre.
 
 ### 4.2 Graphe de guidage
 
@@ -683,47 +689,47 @@ Arêtes (non orientées, longueur en cm) :
 
 Distances depuis `E` : A1 et B1 = 31,5 cm ; A2 et B2 = 39,5 ; A3 et B3 = 47,5 ; A4 et B4 = 55,5. À égalité, la règle de 2.7 choisit la rangée A. Exemple : tout est libre et le conducteur n'a pas d'autorisation PMR → A1 est exclue, B1 est proposée (trajet `E → I1 → B1`).
 
-### 4.3 Format JSON (`GET /api/parking`, `GET` et `PUT /api/config/plan`)
+### 4.3 Format JSON (`GET /api/parking`, `GET` et `PUT /api/config/layout`)
 
 ```json
 {
   "parking": "P1",
-  "nom": "Maquette SUP'COM",
+  "name": "Maquette SUP'COM",
   "dimensions_cm": [60, 40],
-  "places": [
-    { "id": "A1", "type": "pmr",        "rect_cm": [14, 0, 8, 13],  "noeud": "A1" },
-    { "id": "A2", "type": "normale",    "rect_cm": [22, 0, 8, 13],  "noeud": "A2" },
-    { "id": "A3", "type": "normale",    "rect_cm": [30, 0, 8, 13],  "noeud": "A3" },
-    { "id": "A4", "type": "normale",    "rect_cm": [38, 0, 8, 13],  "noeud": "A4" },
-    { "id": "B1", "type": "normale",    "rect_cm": [14, 27, 8, 13], "noeud": "B1" },
-    { "id": "B2", "type": "normale",    "rect_cm": [22, 27, 8, 13], "noeud": "B2" },
-    { "id": "B3", "type": "normale",    "rect_cm": [30, 27, 8, 13], "noeud": "B3" },
-    { "id": "B4", "type": "electrique", "rect_cm": [38, 27, 8, 13], "noeud": "B4" }
+  "spots": [
+    { "id": "A1", "type": "accessible",        "rect_cm": [14, 0, 8, 13],  "node": "A1" },
+    { "id": "A2", "type": "standard",    "rect_cm": [22, 0, 8, 13],  "node": "A2" },
+    { "id": "A3", "type": "standard",    "rect_cm": [30, 0, 8, 13],  "node": "A3" },
+    { "id": "A4", "type": "standard",    "rect_cm": [38, 0, 8, 13],  "node": "A4" },
+    { "id": "B1", "type": "standard",    "rect_cm": [14, 27, 8, 13], "node": "B1" },
+    { "id": "B2", "type": "standard",    "rect_cm": [22, 27, 8, 13], "node": "B2" },
+    { "id": "B3", "type": "standard",    "rect_cm": [30, 27, 8, 13], "node": "B3" },
+    { "id": "B4", "type": "electric", "rect_cm": [38, 27, 8, 13], "node": "B4" }
   ],
-  "zones_interdites": [ { "id": "allee1", "rect_cm": [50, 13, 10, 14] } ],
-  "graphe": {
-    "noeuds": [
-      { "id": "E",  "type": "entree",       "x": 0,  "y": 20 },
+  "forbidden_zones": [ { "id": "allee1", "rect_cm": [50, 13, 10, 14] } ],
+  "graph": {
+    "nodes": [
+      { "id": "E",  "type": "entrance",       "x": 0,  "y": 20 },
       { "id": "I1", "type": "intersection", "x": 18, "y": 20 },
       { "id": "I2", "type": "intersection", "x": 26, "y": 20 },
       { "id": "I3", "type": "intersection", "x": 34, "y": 20 },
       { "id": "I4", "type": "intersection", "x": 42, "y": 20 },
-      { "id": "S",  "type": "sortie",       "x": 60, "y": 20 },
-      { "id": "A1", "type": "place", "x": 18, "y": 6.5 },  { "id": "B1", "type": "place", "x": 18, "y": 33.5 },
-      { "id": "A2", "type": "place", "x": 26, "y": 6.5 },  { "id": "B2", "type": "place", "x": 26, "y": 33.5 },
-      { "id": "A3", "type": "place", "x": 34, "y": 6.5 },  { "id": "B3", "type": "place", "x": 34, "y": 33.5 },
-      { "id": "A4", "type": "place", "x": 42, "y": 6.5 },  { "id": "B4", "type": "place", "x": 42, "y": 33.5 }
+      { "id": "S",  "type": "exit",       "x": 60, "y": 20 },
+      { "id": "A1", "type": "spot", "x": 18, "y": 6.5 },  { "id": "B1", "type": "spot", "x": 18, "y": 33.5 },
+      { "id": "A2", "type": "spot", "x": 26, "y": 6.5 },  { "id": "B2", "type": "spot", "x": 26, "y": 33.5 },
+      { "id": "A3", "type": "spot", "x": 34, "y": 6.5 },  { "id": "B3", "type": "spot", "x": 34, "y": 33.5 },
+      { "id": "A4", "type": "spot", "x": 42, "y": 6.5 },  { "id": "B4", "type": "spot", "x": 42, "y": 33.5 }
     ],
-    "aretes": [
-      { "de": "E",  "a": "I1", "longueur_cm": 18 },
-      { "de": "I1", "a": "I2", "longueur_cm": 8 },
-      { "de": "I2", "a": "I3", "longueur_cm": 8 },
-      { "de": "I3", "a": "I4", "longueur_cm": 8 },
-      { "de": "I4", "a": "S",  "longueur_cm": 18 },
-      { "de": "I1", "a": "A1", "longueur_cm": 13.5 }, { "de": "I1", "a": "B1", "longueur_cm": 13.5 },
-      { "de": "I2", "a": "A2", "longueur_cm": 13.5 }, { "de": "I2", "a": "B2", "longueur_cm": 13.5 },
-      { "de": "I3", "a": "A3", "longueur_cm": 13.5 }, { "de": "I3", "a": "B3", "longueur_cm": 13.5 },
-      { "de": "I4", "a": "A4", "longueur_cm": 13.5 }, { "de": "I4", "a": "B4", "longueur_cm": 13.5 }
+    "edges": [
+      { "from": "E",  "to": "I1", "length_cm": 18 },
+      { "from": "I1", "to": "I2", "length_cm": 8 },
+      { "from": "I2", "to": "I3", "length_cm": 8 },
+      { "from": "I3", "to": "I4", "length_cm": 8 },
+      { "from": "I4", "to": "S",  "length_cm": 18 },
+      { "from": "I1", "to": "A1", "length_cm": 13.5 }, { "from": "I1", "to": "B1", "length_cm": 13.5 },
+      { "from": "I2", "to": "A2", "length_cm": 13.5 }, { "from": "I2", "to": "B2", "length_cm": 13.5 },
+      { "from": "I3", "to": "A3", "length_cm": 13.5 }, { "from": "I3", "to": "B3", "length_cm": 13.5 },
+      { "from": "I4", "to": "A4", "length_cm": 13.5 }, { "from": "I4", "to": "B4", "length_cm": 13.5 }
     ]
   }
 }
@@ -731,7 +737,7 @@ Distances depuis `E` : A1 et B1 = 31,5 cm ; A2 et B2 = 39,5 ; A3 et B3 = 47,5 ; 
 
 Deux repères différents, reliés par l'identifiant des places et des zones :
 - **centimètres** (`rect_cm`, graphe) : pour le plan SVG et le guidage ;
-- **pixels de la caméra** (`poly`, section 5.2) : pour la détection sur le Pi.
+- **pixels de la caméra** (`polygon`, section 5.2) : pour la détection sur le Pi.
 
 ### 4.4 Recommandations physiques
 
@@ -745,7 +751,7 @@ Deux repères différents, reliés par l'identifiant des places et des zones :
 | Éclairage | **LED constante et diffuse** (deux sources de chaque côté), pas de lumière du jour directe ni d'ombre portée de la caméra | Même image le matin et le soir, pas de fausses détections |
 | Résolution | 640 × 480 pour la détection (environ 10 pixels par cm) | Suffisant pour YOLO11n et rapide sur le Pi |
 
-Après toute modification de la caméra ou de la maquette : nouvelle photo de référence, puis nouveau dessin des polygones (`PUT /api/config/polygones`).
+Après toute modification de la caméra ou de la maquette : nouvelle photo de référence, puis nouveau dessin des polygones (`PUT /api/config/polygons`).
 
 ---
 
@@ -757,13 +763,13 @@ Rédaction : Amal (IoT) · Statut : **validé**, repris de [`iot/README.md`](../
 
 | Topic | Exemple | Envoyé quand |
 |---|---|---|
-| `parking/P1/places/<id>` | `{"place":"A3","etat":"occupee","depuis":"2026-11-20T10:02:11Z"}` | changement d'état (retain, QoS 1) |
-| `parking/P1/evenements` | `{"type":"cheval","places":["A3","A4"],"ts":"..."}` | début d'une anomalie |
-| `parking/P1/evenements` | `{"type":"zone_interdite","zone":"allee1","ts":"..."}` | début d'une anomalie |
-| `parking/P1/pi/statut` | `{"en_ligne":true,"fps":0.8,"temp_cpu":61}` | toutes les 60 s |
+| `parking/P1/spots/<id>` | `{"spot":"A3","state":"occupied","since":"2026-11-20T10:02:11Z"}` | changement d'état (retain, QoS 1) |
+| `parking/P1/events` | `{"type":"straddling","spots":["A3","A4"],"ts":"..."}` | début d'une anomalie |
+| `parking/P1/events` | `{"type":"forbidden_zone","zone":"allee1","ts":"..."}` | début d'une anomalie |
+| `parking/P1/pi/status` | `{"online":true,"fps":0.8,"cpu_temp":61}` | toutes les 60 s |
 
-- `etat` vaut `libre` ou `occupee`.
-- Le serveur calcule la règle « ventouse » à partir de `depuis`.
+- `state` vaut `free` ou `occupied`.
+- Le serveur calcule la règle « ventouse » à partir de `since`.
 - Broker Mosquitto en **TLS sur le port 8883**.
 
 ### 5.2 Contrat des polygones (`places.json`)
@@ -772,8 +778,8 @@ Rédaction : Amal (IoT) · Statut : **validé**, repris de [`iot/README.md`](../
 |---|---|
 | `parking` | Identifiant du parking (`"P1"`) |
 | `resolution` | `[largeur, hauteur]` de l'image de la caméra, en pixels |
-| `places` | Liste ; chaque place a `id`, `type` (`normale`, `pmr`, `electrique`), `duree_max_min`, `poly` = liste de points `[x, y]` en pixels |
-| `zones_interdites` | Liste ; chaque zone a `id` et `poly` |
+| `spots` | Liste ; chaque place a `id`, `type` (`standard`, `accessible`, `electric`), `max_duration_min`, `polygon` = liste de points `[x, y]` en pixels |
+| `forbidden_zones` | Liste ; chaque zone a `id` et `polygon` |
 
 Modèle : [`iot/places.exemple.json`](../iot/places.exemple.json) (4 places, exemple de format). Le vrai `places.json` de la maquette aura les 8 places et la zone `allee1` de la section 4, avec les types de 4.1.
 
@@ -783,12 +789,12 @@ Ces ajouts ne changent rien aux messages de 5.1 ; ils complètent le contrat pou
 
 | Topic | Sens | Exemple | Envoyé quand |
 |---|---|---|---|
-| `parking/P1/config` | serveur → Pi | le fichier `places.json` complet (5.2) | à chaque `PUT /api/config/polygones` ou `PATCH /api/config/places/{id}` (retain, QoS 1) |
-| `parking/P1/pi/statut` | Pi → serveur | `{"en_ligne":false}` | **dernière volonté** (LWT, retain) : publiée par le broker si le Pi se déconnecte brutalement |
+| `parking/P1/config` | serveur → Pi | le fichier `places.json` complet (5.2) | à chaque `PUT /api/config/polygons` ou `PATCH /api/config/spots/{id}` (retain, QoS 1) |
+| `parking/P1/pi/status` | Pi → serveur | `{"online":false}` | **dernière volonté** (LWT, retain) : publiée par le broker si le Pi se déconnecte brutalement |
 
 Comptes du broker (mot de passe obligatoire, pas de connexion anonyme) :
 
 | Compte | Publie sur | S'abonne à |
 |---|---|---|
-| `pi` | `parking/P1/places/#`, `parking/P1/evenements`, `parking/P1/pi/statut` | `parking/P1/config` |
-| `serveur` | `parking/P1/config` | `parking/P1/#` |
+| `pi` | `parking/P1/spots/#`, `parking/P1/events`, `parking/P1/pi/status` | `parking/P1/config` |
+| `server` | `parking/P1/config` | `parking/P1/#` |

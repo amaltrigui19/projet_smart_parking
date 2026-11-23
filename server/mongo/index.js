@@ -5,38 +5,38 @@
 //
 // Usage : ./server/scripts/executer-mongo.sh server/mongo/index.js
 
-// Une réservation est « ouverte » tant qu'elle est active ou en_cours (contrat §2.8).
-const OUVERTES = { etat: { $in: ["active", "en_cours"] } };
+// Une réservation est « ouverte » tant qu'elle est active ou in_progress (contrat §2.8).
+const OUVERTES = { state: { $in: ["active", "in_progress"] } };
 
 const INDEX = {
   // Sprint 3 (rappel, déjà créés par seed.js et par les DAO)
-  places: [
+  spots: [
     [{ parking: 1 }, { name: "parking" }],
   ],
-  utilisateurs: [
+  users: [
     [{ email: 1 }, { name: "email_unique", unique: true }],
   ],
 
   // Sprint 4
-  autorisations: [
+  permissions: [
     // « ce conducteur a-t-il une autorisation pmr / electrique ? »
-    [{ utilisateur: 1, type: 1 }, { name: "utilisateur_type" }],
+    [{ user: 1, type: 1 }, { name: "user_type" }],
   ],
   reservations: [
     // historique d'un conducteur, du plus récent au plus ancien
-    [{ utilisateur: 1, creee_le: -1 }, { name: "utilisateur_creee_le" }],
+    [{ user: 1, created_at: -1 }, { name: "user_created_at" }],
     // réservations d'une place dans un état donné (plan : place réservée)
-    [{ place: 1, etat: 1 }, { name: "place_etat" }],
-    // une seule réservation ouverte par conducteur (409 reservation_deja_active)
-    [{ utilisateur: 1 }, { name: "utilisateur_ouverte_unique", unique: true, partialFilterExpression: OUVERTES }],
-    // une seule réservation ouverte par place (409 place_indisponible)
-    [{ place: 1 }, { name: "place_ouverte_unique", unique: true, partialFilterExpression: OUVERTES }],
+    [{ spot: 1, state: 1 }, { name: "spot_state" }],
+    // une seule réservation ouverte par conducteur (409 reservation_already_active)
+    [{ user: 1 }, { name: "user_open_unique", unique: true, partialFilterExpression: OUVERTES }],
+    // une seule réservation ouverte par place (409 spot_unavailable)
+    [{ spot: 1 }, { name: "spot_open_unique", unique: true, partialFilterExpression: OUVERTES }],
   ],
-  evenements: [
+  events: [
     // alertes non traitées, de la plus récente à la plus ancienne
-    [{ traite: 1, debut: -1 }, { name: "traite_debut" }],
-    // filtre par type et par date (GET /api/evenements?type=…&du=…&au=…)
-    [{ type: 1, debut: -1 }, { name: "type_debut" }],
+    [{ handled: 1, start: -1 }, { name: "handled_start" }],
+    // filtre par type et par date (GET /api/events?type=…&from=…&to=…)
+    [{ type: 1, start: -1 }, { name: "type_start" }],
   ],
 };
 

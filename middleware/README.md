@@ -8,10 +8,10 @@ Projet Maven à trois modules (parent : `pom.xml`) :
 | Module | Rôle | État |
 |---|---|---|
 | `iam/` | Identité et accès : comptes (collection `utilisateurs`), hachage PBKDF2, émission des JWT RS256, rôles `CONDUCTEUR` et `EXPLOITANT` | sprint 3 |
-| `core/` | Métier : places, réservations, guidage, alertes, accès MongoDB (connexion unique `ConnexionMongo`), client MQTT. Ne dépend pas de l'API REST | sprint 3 : schéma MongoDB et DAO |
+| `core/` | Métier : places, réservations, guidage, alertes, accès MongoDB (connexion unique `MongoConnection`), client MQTT. Ne dépend pas de l'API REST | sprint 3 : schéma MongoDB et DAO |
 | `api/` | Routes REST (JAX-RS). Dépend de `iam` et de `core`, et produit `api.war` | `GET /api/sante`, `/api/auth/*`, `/api/config/polygones` |
 
-Dépendances : `api` → `iam`, `core` ; `iam` → `core` (pour la connexion MongoDB partagée, `core/donnees/ConnexionMongo`). `core` ne dépend d'aucun autre module. Tous utilisent le même driver : `mongodb-driver-sync` 5.14.0.
+Dépendances : `api` → `iam`, `core` ; `iam` → `core` (pour la connexion MongoDB partagée, `core/persistence/MongoConnection`). `core` ne dépend d'aucun autre module. Tous utilisent le même driver : `mongodb-driver-sync` 5.14.0.
 
 ## État (sprint 3) : authentification et calibration
 
@@ -115,7 +115,7 @@ curl -k https://localhost/api/auth/moi -H "Authorization: Bearer <jeton>"
 
 C'est la route de la page de calibration (`frontend/calibration.html`). Le corps et la réponse ont le format de `places.json` (contrat §5.2) : `parking`, `resolution`, `places[id, type, duree_max_min, poly]`, `zones_interdites[id, poly]`.
 
-**Règles de `400 config_invalide`** (`api/config/ValidationPolygones`). Ce sont les mêmes que dans la page de calibration, la fausse API et `frontend/outils/valider_places.py` :
+**Règles de `400 config_invalide`** (`core/calibration/CalibrationValidator`). Ce sont les mêmes que dans la page de calibration, la fausse API et `frontend/outils/valider_places.py` :
 - identifiant en double (places et zones confondues) ;
 - polygone de moins de 3 points, point non entier, point hors de `resolution` (de 0 à largeur − 1 et de 0 à hauteur − 1), polygone plat ;
 - `type` inconnu (`normale`, `pmr`, `electrique`) ;
@@ -126,8 +126,8 @@ C'est la route de la page de calibration (`frontend/calibration.html`). Le corps
 Toutes les erreurs sont dans `message`, séparées par ` ; ` : la page de calibration en affiche la liste.
 
 **En base**, le `PUT` fait deux choses :
-- les places passent par `DepotPlaces.remplacerPolygones` : type, durée et polygone sont mis à jour, **l'état venant du Pi est conservé**, et les places absentes du fichier sont supprimées ;
-- la résolution et les zones interdites passent par `DepotParkings.enregistrer` : le nom, les dimensions et le `rect_cm` (plan en cm) des zones existantes sont gardés.
+- les places passent par `SpotRepository.replacePolygons` : type, durée et polygone sont mis à jour, **l'état venant du Pi est conservé**, et les places absentes du fichier sont supprimées ;
+- la résolution et les zones interdites passent par `ParkingRepository.save` : le nom, les dimensions et le `rect_cm` (plan en cm) des zones existantes sont gardés.
 
 Le `GET` reconstruit le fichier depuis les deux collections, avec les places triées par identifiant. La publication du fichier au Pi (`parking/P1/config`, contrat §5.3) viendra au sprint suivant.
 
@@ -160,7 +160,7 @@ python frontend/outils/relire_polygones.py --url https://localhost --cacert serv
 middleware/
 ├── pom.xml                    # parent : Java 21, Jakarta EE 11, modules iam, core, api
 ├── Dockerfile                 # Maven (compilation) puis WildFly ; contexte = ce dossier
-├── iam/                       # dépend de core (ConnexionMongo) et du driver mongodb-driver-sync 5.14.0
+├── iam/                       # dépend de core (MongoConnection) et du driver mongodb-driver-sync 5.14.0
 │   ├── src/main/java/tn/supcom/smartparking/iam/
 │   │   ├── Utilisateur.java, Role.java
 │   │   ├── HachageMotDePasse.java       # PBKDF2
@@ -174,15 +174,20 @@ middleware/
 │   └── src/test/java/…                  # 31 tests unitaires
 ├── core/
 │   └── src/main/java/tn/supcom/smartparking/core/
+│       ├── model/                       # Parking, Spot, ForbiddenZone, PlanRect, SpotType, SpotState
+│       ├── persistence/                 # SpotRepository, ParkingRepository (interfaces) + implémentations Mongo
+│       ├── calibration/                 # CalibrationManager (logique métier), Validator, Mapper
+│       ├── exception/                   # BusinessException, NotFound, InvalidConfig, InvalidRequest
+│       └── config/ParkingSettings.java  # id du parking et places du plan (MicroProfile Config)
 └── api/
     └── src/main/
         ├── java/tn/supcom/smartparking/
         │   ├── ApiApplication.java      # JAX-RS sous /api, @LoginConfig MP-JWT
-        │   ├── sante/SanteResource.java
+        │   ├── health/HealthResource.java   # /api/sante
         │   ├── auth/AuthResource.java   # /api/auth/inscription, connexion, moi
-        │   ├── config/                  # /api/config/polygones : ressource, validation, conversion
-        │   ├── CorpsJson.java           # lecture du corps JSON (400 requete_invalide)
-        │   └── erreurs/                 # format {erreur, message} pour toutes les erreurs
+        │   ├── calibration/CalibrationResource.java  # /api/config/polygones, délègue à CalibrationManager
+        │   ├── JsonBody.java            # lecture du corps JSON (400 requete_invalide)
+        │   └── error/                   # format {erreur, message} pour toutes les erreurs (mappers)
         ├── resources/META-INF/microprofile-config.properties   # émetteur et clé publique
         └── webapp/WEB-INF/web.xml       # @RolesAllowed actif, page d'erreur 401 en JSON
 ```
@@ -192,10 +197,12 @@ Collections du contrat §2.14, dans `core/` :
 
 | Classe | Rôle |
 |---|---|
-| `modele/Parking`, `Place`, `ZoneInterdite` | Modèles, avec les règles de validation (polygone ≥ 3 points, durée > 0) |
-| `donnees/ConnexionMongo` | Connexion unique, configurée par les variables `MONGO_*` |
-| `donnees/ConversionMongo` | Traduction Java ↔ documents MongoDB (noms en snake_case du contrat) |
-| `donnees/DepotParkings`, `DepotPlaces` | DAO. `DepotPlaces.remplacerPolygones` enregistre une calibration sans effacer l'état des places |
+| `model/Parking`, `Spot`, `ForbiddenZone` | Modèles, avec les règles de validation (polygone ≥ 3 points, durée > 0) |
+| `persistence/MongoConnection` | Connexion unique, configurée par MicroProfile Config (variables `MONGO_*`) |
+| `persistence/MongoMapper` | Traduction Java ↔ documents MongoDB (noms en snake_case du contrat) |
+| `persistence/SpotRepository`, `ParkingRepository` | Interfaces d'accès aux données, implémentées par `MongoSpotRepository` et `MongoParkingRepository`. `replacePolygons` enregistre une calibration sans effacer l'état des places |
+| `calibration/CalibrationManager` | Logique de la calibration : la ressource REST ne fait que déléguer |
+| `config/ParkingSettings` | `smartparking.parking.id` (P1 par défaut) et `smartparking.parking.spot-ids`, surchargeables par variable d'environnement |
 
 ### Données d'exemple (seed)
 
@@ -225,18 +232,18 @@ cd middleware && mvn test     # 29 tests dans core (conversion, identifiants, mo
 
 ## Base MongoDB : schéma 2 (sprint 4)
 
-Collections `autorisations`, `reservations` et `evenements` du contrat §2.14, dans `core/`. La collection `utilisateurs` existe déjà depuis le sprint 3 (`iam/DepotUtilisateurs`). Les routes qui les utilisent viennent aux sprints 6 à 8 : ce sprint prépare le modèle, l'accès aux données et les index.
+Collections `autorisations`, `reservations` et `evenements` du contrat §2.14, dans `core/`. La collection des comptes appartient au module IAM (`iam/repository/MongoUserRepository`). Les routes qui les utilisent viennent aux sprints 6 à 8 : ce sprint prépare le modèle, l'accès aux données et les index.
 
 | Classe | Rôle |
 |---|---|
-| `modele/Autorisation`, `TypeAutorisation` | Autorisation `pmr` / `electrique`, `valideLe(instant)` (début inclus, fin exclue, `fin = null` = sans fin) |
-| `modele/Reservation`, `EtatReservation`, `Paiement` | États du contrat §2.8 ; `EtatReservation.OUVERTS` = `active`, `en_cours` |
-| `modele/Evenement`, `TypeEvenement`, `SourceEvenement` | Anomalies `cheval`, `zone_interdite` (Pi), `ventouse`, `place_speciale` (serveur) |
-| `donnees/Identifiants` | `ObjectId` en base ↔ `u_…`, `r_…`, `evt_…`, `aut_…` dans l'API |
-| `donnees/ConversionActivite` | Traduction Java ↔ documents MongoDB. Les références à un utilisateur (`utilisateur`, `accordee_par`, `traite_par`) sont des `ObjectId`, comme `utilisateurs._id` |
-| `donnees/DepotAutorisations` | `creer`, `duUtilisateur`, `aUneValide(utilisateur, type, instant)`, `supprimer` |
-| `donnees/DepotReservations` | `creer`, `parId`, `lister(utilisateur, etat, limite)`, `ouverteDuUtilisateur`, `ouverteSurPlace`, `ouvertes`, `mettreAJour(r, etatAttendu)` |
-| `donnees/DepotEvenements` | `creer`, `parId`, `lister(traite, type, du, au, limite)`, `nombreNonTraites`, `marquerTraite`, `terminer` |
+| `model/Permission`, `PermissionType` | Autorisation `pmr` / `electrique`, `isValidAt(instant)` (début inclus, fin exclue, `end = null` = sans fin) |
+| `model/Reservation`, `ReservationState`, `Payment` | États du contrat §2.8 ; `ReservationState.OPEN` = `active`, `en_cours` |
+| `model/Event`, `EventType`, `EventSource` | Anomalies `cheval`, `zone_interdite` (Pi), `ventouse`, `place_speciale` (serveur) |
+| `persistence/ApiIds` | `ObjectId` en base ↔ `u_…`, `r_…`, `evt_…`, `aut_…` dans l'API |
+| `persistence/ActivityMapper` | Traduction Java ↔ documents MongoDB. Les références à un utilisateur (`utilisateur`, `accordee_par`, `traite_par`) sont des `ObjectId`, comme `utilisateurs._id` |
+| `persistence/PermissionRepository` (+ `MongoPermissionRepository`) | `create`, `findByUser`, `hasValid(userId, type, instant)`, `delete` |
+| `persistence/ReservationRepository` (+ `MongoReservationRepository`) | `create`, `findById`, `list(userId, state, limit)`, `findOpenByUser`, `findOpenBySpot`, `findOpen`, `update(r, expectedState)` |
+| `persistence/EventRepository` (+ `MongoEventRepository`) | `create`, `findById`, `list(handled, type, from, to, limit)`, `countUnhandled`, `markHandled`, `close` |
 
 ### Index
 
@@ -250,7 +257,7 @@ Collections `autorisations`, `reservations` et `evenements` du contrat §2.14, d
 | `evenements` | `traite_debut` : `{traite, debut: -1}` | alertes non traitées |
 | `evenements` | `type_debut` : `{type, debut: -1}` | filtre par type et par date |
 
-Les deux index uniques partiels ne sont pas dans le contrat : ils font respecter les règles du §2.8 **par la base**, même si deux requêtes arrivent en même temps. `DepotReservations` les traduit en `ReservationEnConflit` (motif `UTILISATEUR` ou `PLACE`), que l'API traduira en `409`. Une réservation terminée, payée, annulée ou expirée n'est pas concernée : l'historique peut en contenir autant qu'on veut.
+Les deux index uniques partiels ne sont pas dans le contrat : ils font respecter les règles du §2.8 **par la base**, même si deux requêtes arrivent en même temps. `MongoReservationRepository` les traduit en `ReservationConflictException` (motif `USER` ou `SPOT`), que l'API traduira en `409`. Une réservation terminée, payée, annulée ou expirée n'est pas concernée : l'historique peut en contenir autant qu'on veut.
 
 Les index sont créés par les DAO au premier accès **et** par `server/mongo/index.js`, avec les mêmes noms et options. Si on en change un, il faut changer l'autre : sinon MongoDB refuse avec `IndexOptionsConflict`.
 
