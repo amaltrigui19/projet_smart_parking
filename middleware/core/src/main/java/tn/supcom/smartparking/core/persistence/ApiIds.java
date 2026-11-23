@@ -12,8 +12,7 @@ public final class ApiIds {
     public static final String USER = "u_";
     public static final String RESERVATION = "r_";
     public static final String EVENT = "evt_";
-    /** Becomes "perm_" with the English contract. */
-    public static final String PERMISSION = "aut_";
+    public static final String PERMISSION = "perm_";
 
     private ApiIds() {
     }

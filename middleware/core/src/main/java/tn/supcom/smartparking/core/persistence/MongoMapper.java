@@ -14,7 +14,7 @@ import tn.supcom.smartparking.core.model.SpotType;
 
 /**
  * Converts between Java models and MongoDB documents (contract §2.14). No database access.
- * Field names stay those of the contract (snake_case) until the English contract is agreed.
+ * Field names follow the English contract (snake_case).
  */
 final class MongoMapper {
 
@@ -27,25 +27,25 @@ final class MongoMapper {
         return new Document("_id", s.id())
                 .append("parking", s.parkingId())
                 .append("type", s.type().value())
-                .append("duree_max_min", s.maxDurationMin())
-                .append("poly", polygonToList(s.polygon()))
+                .append("max_duration_min", s.maxDurationMin())
+                .append("polygon", polygonToList(s.polygon()))
                 .append("rect_cm", rectToList(s.planRect()))
-                .append("noeud", s.graphNode())
-                .append("etat", s.state().value())
-                .append("depuis", s.since() == null ? null : Date.from(s.since()));
+                .append("node", s.graphNode())
+                .append("state", s.state().value())
+                .append("since", s.since() == null ? null : Date.from(s.since()));
     }
 
     static Spot toSpot(Document d) {
-        String state = d.getString("etat");
-        Date since = d.getDate("depuis");
+        String state = d.getString("state");
+        Date since = d.getDate("since");
         return new Spot(
                 d.getString("_id"),
                 d.getString("parking"),
                 SpotType.fromValue(d.getString("type")),
-                number(d.get("duree_max_min")).intValue(),
-                listToPolygon(d.get("poly")),
+                number(d.get("max_duration_min")).intValue(),
+                listToPolygon(d.get("polygon")),
                 listToRect(d.get("rect_cm")),
-                d.getString("noeud"),
+                d.getString("node"),
                 state == null ? SpotState.FREE : SpotState.fromValue(state),
                 since == null ? null : since.toInstant());
     }
@@ -57,30 +57,30 @@ final class MongoMapper {
         List<Document> zones = new ArrayList<>();
         for (ForbiddenZone z : p.forbiddenZones()) {
             zones.add(new Document("id", z.id())
-                    .append("poly", polygonToList(z.polygon()))
+                    .append("polygon", polygonToList(z.polygon()))
                     .append("rect_cm", rectToList(z.planRect())));
         }
-        return new Document("nom", p.name())
+        return new Document("name", p.name())
                 .append("resolution", List.of(p.widthPx(), p.heightPx()))
                 .append("dimensions_cm", List.of(p.widthCm(), p.heightCm()))
-                .append("zones_interdites", zones)
-                .append("maj_le", p.updatedAt() == null ? null : Date.from(p.updatedAt()));
+                .append("forbidden_zones", zones)
+                .append("updated_at", p.updatedAt() == null ? null : Date.from(p.updatedAt()));
     }
 
     static Parking toParking(Document d) {
         List<?> resolution = (List<?>) d.get("resolution");
         List<?> dimensions = (List<?>) d.get("dimensions_cm");
         List<ForbiddenZone> zones = new ArrayList<>();
-        if (d.get("zones_interdites") instanceof List<?> list) {
+        if (d.get("forbidden_zones") instanceof List<?> list) {
             for (Object o : list) {
                 Document z = (Document) o;
-                zones.add(new ForbiddenZone(z.getString("id"), listToPolygon(z.get("poly")), listToRect(z.get("rect_cm"))));
+                zones.add(new ForbiddenZone(z.getString("id"), listToPolygon(z.get("polygon")), listToRect(z.get("rect_cm"))));
             }
         }
-        Date updatedAt = d.getDate("maj_le");
+        Date updatedAt = d.getDate("updated_at");
         return new Parking(
                 d.getString("_id"),
-                d.getString("nom"),
+                d.getString("name"),
                 number(resolution.get(0)).intValue(),
                 number(resolution.get(1)).intValue(),
                 dimensions == null ? 0 : number(dimensions.get(0)).doubleValue(),
@@ -91,7 +91,7 @@ final class MongoMapper {
 
     // ---------- Helpers ----------
 
-    /** [[x, y], ...]: the "poly" format of places.json (contract §5.2). */
+    /** [[x, y], ...]: the "polygon" format of places.json (contract §5.2). */
     static List<List<Integer>> polygonToList(List<Point> polygon) {
         List<List<Integer>> list = new ArrayList<>();
         for (Point p : polygon) {

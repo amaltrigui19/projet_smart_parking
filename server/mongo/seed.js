@@ -15,50 +15,50 @@ function polyDepuisRect([x, y, l, h]) {
 }
 
 const places = [
-  { id: "A1", type: "pmr",        rect: [14, 0, 8, 13] },
-  { id: "A2", type: "normale",    rect: [22, 0, 8, 13] },
-  { id: "A3", type: "normale",    rect: [30, 0, 8, 13] },
-  { id: "A4", type: "normale",    rect: [38, 0, 8, 13] },
-  { id: "B1", type: "normale",    rect: [14, 27, 8, 13] },
-  { id: "B2", type: "normale",    rect: [22, 27, 8, 13] },
-  { id: "B3", type: "normale",    rect: [30, 27, 8, 13] },
-  { id: "B4", type: "electrique", rect: [38, 27, 8, 13] },
+  { id: "A1", type: "accessible", rect: [14, 0, 8, 13] },
+  { id: "A2", type: "standard",   rect: [22, 0, 8, 13] },
+  { id: "A3", type: "standard",   rect: [30, 0, 8, 13] },
+  { id: "A4", type: "standard",   rect: [38, 0, 8, 13] },
+  { id: "B1", type: "standard",   rect: [14, 27, 8, 13] },
+  { id: "B2", type: "standard",   rect: [22, 27, 8, 13] },
+  { id: "B3", type: "standard",   rect: [30, 27, 8, 13] },
+  { id: "B4", type: "electric",   rect: [38, 27, 8, 13] },
 ];
 
 db.parkings.replaceOne(
   { _id: "P1" },
   {
     _id: "P1",
-    nom: "Maquette SUP'COM",
+    name: "Maquette SUP'COM",
     resolution: RESOLUTION,
     dimensions_cm: DIMENSIONS_CM,
-    zones_interdites: [
-      { id: "allee1", poly: polyDepuisRect([50, 13, 10, 14]), rect_cm: [50, 13, 10, 14] },
+    forbidden_zones: [
+      { id: "allee1", polygon: polyDepuisRect([50, 13, 10, 14]), rect_cm: [50, 13, 10, 14] },
     ],
-    maj_le: new Date(),
+    updated_at: new Date(),
   },
   { upsert: true }
 );
 
 for (const p of places) {
-  db.places.replaceOne(
+  db.spots.replaceOne(
     { _id: p.id },
     {
       _id: p.id,
       parking: "P1",
       type: p.type,
-      duree_max_min: p.type === "electrique" ? 60 : 120,
-      poly: polyDepuisRect(p.rect),
+      max_duration_min: p.type === "electric" ? 60 : 120,
+      polygon: polyDepuisRect(p.rect),
       rect_cm: p.rect,
-      noeud: p.id,
-      etat: "libre",
-      depuis: null,
-      verrou: null,
+      node: p.id,
+      state: "free",
+      since: null,
+      lock: null,
     },
     { upsert: true }
   );
 }
 
-db.places.createIndex({ parking: 1 }, { name: "parking" });
+db.spots.createIndex({ parking: 1 }, { name: "parking" });
 
-print(`Seed terminé : ${db.parkings.countDocuments()} parking, ${db.places.countDocuments({ parking: "P1" })} places.`);
+print(`Seed terminé : ${db.parkings.countDocuments()} parking, ${db.spots.countDocuments({ parking: "P1" })} places.`);

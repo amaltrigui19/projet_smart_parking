@@ -30,7 +30,7 @@ public class MongoParkingRepository implements ParkingRepository {
 
     @Override
     public void save(Parking parking) {
-        Document fields = MongoMapper.parkingFields(parking).append("maj_le", new Date());
+        Document fields = MongoMapper.parkingFields(parking).append("updated_at", new Date());
         collection().updateOne(Filters.eq("_id", parking.id()), new Document("$set", fields),
                 new UpdateOptions().upsert(true));
     }

@@ -6,32 +6,25 @@
 //
 // Usage : ./server/scripts/executer-mongo.sh server/mongo/exemples.js
 
-const crypto = require("crypto");
-
-// Mot de passe de test des deux conducteurs d'exemple (connexion possible avec /api/auth/connexion).
+// Mot de passe de test des deux conducteurs d'exemple (connexion possible avec /api/auth/login).
 const MOT_DE_PASSE_EXEMPLE = "Exemple-2026";
+// Empreinte Argon2id précalculée de MOT_DE_PASSE_EXEMPLE (format de middleware/iam Argon2Utility,
+// fournie et vérifiée par Maissa dans la PR #24). Le mot de passe d'exemple est fixe et public.
+const EMPREINTE_EXEMPLE = "$argon2id$v=19$m=19456,t=2,p=1$/9wbK/2DH2M2gycW/yA/yg$f7Yy8M6zT2zt9VflgQZildTij3cMs+FzcDPeP0c54cM";
 
 const maintenant = new Date();
 const ilYa = (minutes) => new Date(maintenant.getTime() - minutes * 60_000);
 const dans = (minutes) => new Date(maintenant.getTime() + minutes * 60_000);
 
-// Même format que middleware/iam HachageMotDePasse : pbkdf2_sha256$<itérations>$<sel b64>$<empreinte b64>
-function hacher(motDePasse) {
-  const iterations = 600000;
-  const sel = crypto.randomBytes(16);
-  const empreinte = crypto.pbkdf2Sync(motDePasse, sel, iterations, 32, "sha256");
-  return `pbkdf2_sha256$${iterations}$${sel.toString("base64")}$${empreinte.toString("base64")}`;
-}
-
 // ---------- Utilisateurs ----------
 // Un compte existant (même email) n'est pas modifié : on réutilise son _id.
-function conducteur(nom, email) {
-  const existant = db.utilisateurs.findOne({ email });
+function conducteur(name, email) {
+  const existant = db.users.findOne({ email });
   if (existant) return existant._id;
   const _id = new ObjectId();
-  db.utilisateurs.insertOne({
-    _id, nom, email, mot_de_passe_hash: hacher(MOT_DE_PASSE_EXEMPLE),
-    role: "CONDUCTEUR", actif: true, cree_le: ilYa(7 * 24 * 60),
+  db.users.insertOne({
+    _id, name, email, password_hash: EMPREINTE_EXEMPLE,
+    role: "DRIVER", active: true, created_at: ilYa(7 * 24 * 60),
   });
   return _id;
 }
@@ -39,40 +32,40 @@ function conducteur(nom, email) {
 const sara = conducteur("Sara Ben Ali", "sara@exemple.tn");
 const youssef = conducteur("Youssef Trabelsi", "youssef@exemple.tn");
 
-// L'exploitant de démo (créé par WildFly depuis server/.env) s'il existe ; sinon null.
-const exploitant = db.utilisateurs.findOne({ role: "EXPLOITANT" }, { _id: 1 });
+// L'opérateur de démo (créé par WildFly depuis server/.env) s'il existe ; sinon null.
+const exploitant = db.users.findOne({ role: "OPERATOR" }, { _id: 1 });
 const exploitantId = exploitant ? exploitant._id : null;
 
 // ---------- Autorisations ----------
-db.autorisations.replaceOne(
+db.permissions.replaceOne(
   { _id: ObjectId("64e0000000000000000a0001") },
-  { utilisateur: sara, type: "pmr", debut: ilYa(7 * 24 * 60), fin: null, accordee_par: exploitantId },
+  { user: sara, type: "accessible", start: ilYa(7 * 24 * 60), end: null, granted_by: exploitantId },
   { upsert: true }
 );
 
 // ---------- Réservations ----------
-// Une seule réservation ouverte (active / en_cours) par conducteur et par place : voir index.js.
+// Une seule réservation ouverte (active / in_progress) par conducteur et par place : voir index.js.
 const reservations = [
   { // payée : 1 h 19 sur place → 1 h 30 facturée à 1,5 TND/h
-    _id: ObjectId("64e0000000000000000b0001"), utilisateur: sara, place: "B2", etat: "payee",
-    creee_le: ilYa(2 * 24 * 60 + 85), expire_le: ilYa(2 * 24 * 60 + 70),
-    debut: ilYa(2 * 24 * 60 + 82), fin: ilYa(2 * 24 * 60 + 3), montant: 2.25, devise: "TND",
-    paiement: { moyen: "simule", paye_le: ilYa(2 * 24 * 60 + 2), recu: "RECU-2026-000001" },
+    _id: ObjectId("64e0000000000000000b0001"), user: sara, spot: "B2", state: "paid",
+    created_at: ilYa(2 * 24 * 60 + 85), expires_at: ilYa(2 * 24 * 60 + 70),
+    start: ilYa(2 * 24 * 60 + 82), end: ilYa(2 * 24 * 60 + 3), amount: 2.25, currency: "TND",
+    payment: { method: "simulated", paid_at: ilYa(2 * 24 * 60 + 2), receipt: "RECU-2026-000001" },
   },
   { // annulée par le conducteur
-    _id: ObjectId("64e0000000000000000b0002"), utilisateur: youssef, place: "A3", etat: "annulee",
-    creee_le: ilYa(26 * 60), expire_le: ilYa(26 * 60 - 15),
-    debut: null, fin: null, montant: null, devise: null, paiement: null,
+    _id: ObjectId("64e0000000000000000b0002"), user: youssef, spot: "A3", state: "cancelled",
+    created_at: ilYa(26 * 60), expires_at: ilYa(26 * 60 - 15),
+    start: null, end: null, amount: null, currency: null, payment: null,
   },
   { // expirée : 15 min sans arrivée
-    _id: ObjectId("64e0000000000000000b0003"), utilisateur: youssef, place: "A2", etat: "expiree",
-    creee_le: ilYa(25 * 60), expire_le: ilYa(25 * 60 - 15),
-    debut: null, fin: null, montant: null, devise: null, paiement: null,
+    _id: ObjectId("64e0000000000000000b0003"), user: youssef, spot: "A2", state: "expired",
+    created_at: ilYa(25 * 60), expires_at: ilYa(25 * 60 - 15),
+    start: null, end: null, amount: null, currency: null, payment: null,
   },
   { // active en ce moment : B3 apparaît « réservée » sur le plan
-    _id: ObjectId("64e0000000000000000b0004"), utilisateur: sara, place: "B3", etat: "active",
-    creee_le: ilYa(2), expire_le: dans(13),
-    debut: null, fin: null, montant: null, devise: null, paiement: null,
+    _id: ObjectId("64e0000000000000000b0004"), user: sara, spot: "B3", state: "active",
+    created_at: ilYa(2), expires_at: dans(13),
+    start: null, end: null, amount: null, currency: null, payment: null,
   },
 ];
 
@@ -81,43 +74,43 @@ for (const r of reservations) {
     db.reservations.replaceOne({ _id: r._id }, r, { upsert: true });
   } catch (e) {
     // index unique partiel : une autre réservation ouverte existe déjà (créée depuis l'API)
-    print(`[ATTENTION] réservation ${r.place} (${r.etat}) non écrite : ${e.message}`);
+    print(`[ATTENTION] réservation ${r.spot} (${r.state}) non écrite : ${e.message}`);
   }
 }
 
 // ---------- Événements ----------
 const evenements = [
   {
-    _id: ObjectId("64e0000000000000000c0001"), parking: "P1", type: "cheval", places: ["A3", "A4"], zone: null,
-    debut: ilYa(5), fin: null, source: "pi", details: null,
-    traite: false, traite_par: null, traite_le: null, commentaire: null,
+    _id: ObjectId("64e0000000000000000c0001"), parking: "P1", type: "straddling", spots: ["A3", "A4"], zone: null,
+    start: ilYa(5), end: null, source: "pi", details: null,
+    handled: false, handled_by: null, handled_at: null, comment: null,
   },
   {
-    _id: ObjectId("64e0000000000000000c0002"), parking: "P1", type: "ventouse", places: ["A2"], zone: null,
-    debut: ilYa(3 * 60), fin: ilYa(2 * 60), source: "serveur", details: { duree_min: 121, duree_max_min: 120 },
-    traite: true, traite_par: exploitantId, traite_le: ilYa(150), commentaire: "Conducteur prévenu",
+    _id: ObjectId("64e0000000000000000c0002"), parking: "P1", type: "overstay", spots: ["A2"], zone: null,
+    start: ilYa(3 * 60), end: ilYa(2 * 60), source: "server", details: { duration_min: 121, max_duration_min: 120 },
+    handled: true, handled_by: exploitantId, handled_at: ilYa(150), comment: "Conducteur prévenu",
   },
   {
-    _id: ObjectId("64e0000000000000000c0003"), parking: "P1", type: "zone_interdite", places: [], zone: "allee1",
-    debut: ilYa(40), fin: ilYa(32), source: "pi", details: null,
-    traite: false, traite_par: null, traite_le: null, commentaire: null,
+    _id: ObjectId("64e0000000000000000c0003"), parking: "P1", type: "forbidden_zone", spots: [], zone: "allee1",
+    start: ilYa(40), end: ilYa(32), source: "pi", details: null,
+    handled: false, handled_by: null, handled_at: null, comment: null,
   },
   {
-    _id: ObjectId("64e0000000000000000c0004"), parking: "P1", type: "place_speciale", places: ["A1"], zone: null,
-    debut: ilYa(12), fin: null, source: "serveur", details: { type_place: "pmr" },
-    traite: false, traite_par: null, traite_le: null, commentaire: null,
+    _id: ObjectId("64e0000000000000000c0004"), parking: "P1", type: "unauthorized_special_spot", spots: ["A1"], zone: null,
+    start: ilYa(12), end: null, source: "server", details: { spot_type: "accessible" },
+    handled: false, handled_by: null, handled_at: null, comment: null,
   },
 ];
 
 for (const e of evenements) {
-  db.evenements.replaceOne({ _id: e._id }, e, { upsert: true });
+  db.events.replaceOne({ _id: e._id }, e, { upsert: true });
 }
 
 print(
-  `Exemples chargés : ${db.utilisateurs.countDocuments({ role: "CONDUCTEUR" })} conducteur(s), ` +
-  `${db.autorisations.countDocuments()} autorisation(s), ${db.reservations.countDocuments()} réservation(s), ` +
-  `${db.evenements.countDocuments()} événement(s).`
+  `Exemples chargés : ${db.users.countDocuments({ role: "DRIVER" })} conducteur(s), ` +
+  `${db.permissions.countDocuments()} autorisation(s), ${db.reservations.countDocuments()} réservation(s), ` +
+  `${db.events.countDocuments()} événement(s).`
 );
 if (!exploitantId) {
-  print("(aucun exploitant en base : accordee_par et traite_par restent null ; démarrer WildFly avec EXPLOITANT_EMAIL pour le créer)");
+  print("(aucun opérateur en base : granted_by et handled_by restent null ; démarrer WildFly avec OPERATOR_EMAIL pour le créer)");
 }

@@ -37,16 +37,16 @@ class MongoMapperTest {
         Document d = MongoMapper.toDocument(spotA3());
         assertEquals("A3", d.get("_id"));
         assertEquals("accessible", d.get("type"));
-        assertEquals(120, d.get("duree_max_min"));
-        assertEquals("occupied", d.get("etat"));
-        assertEquals(List.of(40, 60), ((List<?>) d.get("poly")).get(0));
+        assertEquals(120, d.get("max_duration_min"));
+        assertEquals("occupied", d.get("state"));
+        assertEquals(List.of(40, 60), ((List<?>) d.get("polygon")).get(0));
     }
 
     @Test
     void readsDecimalNumbersWrittenByMongosh() {
         Document d = new Document("_id", "A1").append("parking", "P1").append("type", "standard")
-                .append("duree_max_min", 120.0)
-                .append("poly", List.of(List.of(149.0, 0.0), List.of(235.0, 0.0), List.of(235.0, 156.0)));
+                .append("max_duration_min", 120.0)
+                .append("polygon", List.of(List.of(149.0, 0.0), List.of(235.0, 0.0), List.of(235.0, 156.0)));
         Spot s = MongoMapper.toSpot(d);
         assertEquals(120, s.maxDurationMin());
         assertEquals(new Point(235, 156), s.polygon().get(2));

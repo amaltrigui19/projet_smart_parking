@@ -17,11 +17,11 @@ import org.bson.Document;
 import tn.supcom.smartparking.core.model.Spot;
 import tn.supcom.smartparking.core.model.SpotState;
 
-/** {@link SpotRepository} backed by the {@code places} collection (contract §2.14), indexed on {@code parking}. */
+/** {@link SpotRepository} backed by the {@code spots} collection (contract §2.14), indexed on {@code parking}. */
 @ApplicationScoped
 public class MongoSpotRepository implements SpotRepository {
 
-    static final String COLLECTION = "places";
+    static final String COLLECTION = "spots";
 
     @Inject
     MongoConnection connection;
@@ -67,13 +67,13 @@ public class MongoSpotRepository implements SpotRepository {
                     Updates.combine(
                             Updates.set("parking", parkingId),
                             Updates.set("type", s.type().value()),
-                            Updates.set("duree_max_min", s.maxDurationMin()),
-                            Updates.set("poly", MongoMapper.polygonToList(s.polygon())),
+                            Updates.set("max_duration_min", s.maxDurationMin()),
+                            Updates.set("polygon", MongoMapper.polygonToList(s.polygon())),
                             // only when the spot is new:
-                            Updates.setOnInsert("etat", SpotState.FREE.value()),
-                            Updates.setOnInsert("depuis", null),
+                            Updates.setOnInsert("state", SpotState.FREE.value()),
+                            Updates.setOnInsert("since", null),
                             Updates.setOnInsert("rect_cm", null),
-                            Updates.setOnInsert("noeud", null)),
+                            Updates.setOnInsert("node", null)),
                     new UpdateOptions().upsert(true));
         }
         collection().deleteMany(Filters.and(Filters.eq("parking", parkingId), Filters.nin("_id", ids)));

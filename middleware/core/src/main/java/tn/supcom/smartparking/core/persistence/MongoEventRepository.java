@@ -22,14 +22,14 @@ import tn.supcom.smartparking.core.model.Event;
 import tn.supcom.smartparking.core.model.EventType;
 
 /**
- * {@link EventRepository} backed by the {@code evenements} collection (contract §2.14),
- * indexes {@code traite + debut} and {@code type + debut}. The same indexes are created by
+ * {@link EventRepository} backed by the {@code events} collection (contract §2.14),
+ * indexes {@code handled + start} and {@code type + start}. The same indexes are created by
  * {@code server/mongo/index.js}.
  */
 @ApplicationScoped
 public class MongoEventRepository implements EventRepository {
 
-    static final String COLLECTION = "evenements";
+    static final String COLLECTION = "events";
 
     @Inject
     MongoConnection connection;
@@ -39,10 +39,10 @@ public class MongoEventRepository implements EventRepository {
     private MongoCollection<Document> collection() {
         MongoCollection<Document> c = connection.database().getCollection(COLLECTION);
         if (!indexCreated) {
-            c.createIndex(Indexes.compoundIndex(Indexes.ascending("traite"), Indexes.descending("debut")),
-                    new IndexOptions().name("traite_debut"));
-            c.createIndex(Indexes.compoundIndex(Indexes.ascending("type"), Indexes.descending("debut")),
-                    new IndexOptions().name("type_debut"));
+            c.createIndex(Indexes.compoundIndex(Indexes.ascending("handled"), Indexes.descending("start")),
+                    new IndexOptions().name("handled_start"));
+            c.createIndex(Indexes.compoundIndex(Indexes.ascending("type"), Indexes.descending("start")),
+                    new IndexOptions().name("type_start"));
             indexCreated = true;
         }
         return c;
@@ -65,13 +65,13 @@ public class MongoEventRepository implements EventRepository {
     @Override
     public List<Event> list(Boolean handled, EventType type, Instant from, Instant to, int limit) {
         List<Bson> filters = new ArrayList<>();
-        if (handled != null) filters.add(Filters.eq("traite", handled));
+        if (handled != null) filters.add(Filters.eq("handled", handled));
         if (type != null) filters.add(Filters.eq("type", type.value()));
-        if (from != null) filters.add(Filters.gte("debut", Date.from(from)));
-        if (to != null) filters.add(Filters.lt("debut", Date.from(to)));
+        if (from != null) filters.add(Filters.gte("start", Date.from(from)));
+        if (to != null) filters.add(Filters.lt("start", Date.from(to)));
         Bson filter = filters.isEmpty() ? new Document() : Filters.and(filters);
         List<Event> list = new ArrayList<>();
-        for (Document d : collection().find(filter).sort(Sorts.descending("debut"))
+        for (Document d : collection().find(filter).sort(Sorts.descending("start"))
                 .limit(Math.max(1, Math.min(MAX_LIMIT, limit)))) {
             list.add(ActivityMapper.toEvent(d));
         }
@@ -80,7 +80,7 @@ public class MongoEventRepository implements EventRepository {
 
     @Override
     public long countUnhandled() {
-        return collection().countDocuments(Filters.eq("traite", false));
+        return collection().countDocuments(Filters.eq("handled", false));
     }
 
     @Override
@@ -90,10 +90,10 @@ public class MongoEventRepository implements EventRepository {
             return Optional.empty();
         }
         Bson update = Updates.combine(
-                Updates.set("traite", handled),
-                Updates.set("traite_par", handled ? ApiIds.optional(ApiIds.USER, operatorId) : null),
-                Updates.set("traite_le", handled ? Date.from(now) : null),
-                Updates.set("commentaire", comment));
+                Updates.set("handled", handled),
+                Updates.set("handled_by", handled ? ApiIds.optional(ApiIds.USER, operatorId) : null),
+                Updates.set("handled_at", handled ? Date.from(now) : null),
+                Updates.set("comment", comment));
         return Optional.ofNullable(collection().findOneAndUpdate(Filters.eq("_id", oid.get()), update,
                         new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)))
                 .map(ActivityMapper::toEvent);
@@ -103,7 +103,7 @@ public class MongoEventRepository implements EventRepository {
     public boolean close(String id, Instant end) {
         Optional<ObjectId> oid = ApiIds.fromApi(ApiIds.EVENT, id);
         return oid.isPresent() && collection().updateOne(
-                Filters.and(Filters.eq("_id", oid.get()), Filters.eq("fin", null)),
-                Updates.set("fin", Date.from(end))).getModifiedCount() == 1;
+                Filters.and(Filters.eq("_id", oid.get()), Filters.eq("end", null)),
+                Updates.set("end", Date.from(end))).getModifiedCount() == 1;
     }
 }

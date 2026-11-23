@@ -70,11 +70,11 @@ class ActivityModelsTest {
     @Test
     void detailsCopiedAndUnmodifiable() {
         Map<String, Object> details = new HashMap<>();
-        details.put("duree_min", 121);
+        details.put("duration_min", 121);
         details.put("note", null);   // a null value is accepted
         Event e = Event.create("P1", EventType.OVERSTAY, List.of("A2"), null, T, EventSource.SERVER, details);
-        details.put("duree_min", 5);
-        assertEquals(121, e.details().get("duree_min"));
+        details.put("duration_min", 5);
+        assertEquals(121, e.details().get("duration_min"));
         assertThrows(UnsupportedOperationException.class, () -> e.details().put("x", 1));
     }
 

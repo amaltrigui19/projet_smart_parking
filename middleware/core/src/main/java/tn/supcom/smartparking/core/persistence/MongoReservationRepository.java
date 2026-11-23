@@ -21,7 +21,7 @@ import tn.supcom.smartparking.core.model.ReservationState;
 /**
  * {@link ReservationRepository} backed by the {@code reservations} collection (contract §2.14).
  *
- * <p>Contract indexes: {@code utilisateur + creee_le} (history) and {@code place + etat}.
+ * <p>Contract indexes: {@code user + created_at} (history) and {@code spot + state}.
  * Two extra <b>partial</b> unique indexes, limited to open states (active, in progress): the database itself
  * guarantees "one open reservation per driver" and "per spot", even when two requests arrive at the same time.
  * The same indexes are created by {@code server/mongo/index.js} (same names).
@@ -30,8 +30,8 @@ import tn.supcom.smartparking.core.model.ReservationState;
 public class MongoReservationRepository implements ReservationRepository {
 
     static final String COLLECTION = "reservations";
-    static final String INDEX_USER_OPEN = "utilisateur_ouverte_unique";
-    static final String INDEX_SPOT_OPEN = "place_ouverte_unique";
+    static final String INDEX_USER_OPEN = "user_open_unique";
+    static final String INDEX_SPOT_OPEN = "spot_open_unique";
 
     @Inject
     MongoConnection connection;
@@ -41,25 +41,25 @@ public class MongoReservationRepository implements ReservationRepository {
     private MongoCollection<Document> collection() {
         MongoCollection<Document> c = connection.database().getCollection(COLLECTION);
         if (!indexCreated) {
-            c.createIndex(Indexes.compoundIndex(Indexes.ascending("utilisateur"), Indexes.descending("creee_le")),
-                    new IndexOptions().name("utilisateur_creee_le"));
-            c.createIndex(Indexes.ascending("place", "etat"), new IndexOptions().name("place_etat"));
-            c.createIndex(Indexes.ascending("utilisateur"), new IndexOptions().name(INDEX_USER_OPEN)
+            c.createIndex(Indexes.compoundIndex(Indexes.ascending("user"), Indexes.descending("created_at")),
+                    new IndexOptions().name("user_created_at"));
+            c.createIndex(Indexes.ascending("spot", "state"), new IndexOptions().name("spot_state"));
+            c.createIndex(Indexes.ascending("user"), new IndexOptions().name(INDEX_USER_OPEN)
                     .unique(true).partialFilterExpression(openFilter()));
-            c.createIndex(Indexes.ascending("place"), new IndexOptions().name(INDEX_SPOT_OPEN)
+            c.createIndex(Indexes.ascending("spot"), new IndexOptions().name(INDEX_SPOT_OPEN)
                     .unique(true).partialFilterExpression(openFilter()));
             indexCreated = true;
         }
         return c;
     }
 
-    /** {etat: {$in: ["active", "en_cours"]}}: identical to the filter in index.js. */
+    /** {state: {$in: ["active", "in_progress"]}}: identical to the filter in index.js. */
     static Bson openFilter() {
         List<String> open = new ArrayList<>();
         for (ReservationState s : ReservationState.values()) {
             if (s.isOpen()) open.add(s.value());
         }
-        return Filters.in("etat", open);
+        return Filters.in("state", open);
     }
 
     @Override
@@ -86,14 +86,14 @@ public class MongoReservationRepository implements ReservationRepository {
         if (userId != null) {
             Optional<ObjectId> u = ApiIds.fromApi(ApiIds.USER, userId);
             if (u.isEmpty()) return List.of();
-            filters.add(Filters.eq("utilisateur", u.get()));
+            filters.add(Filters.eq("user", u.get()));
         }
         if (state != null) {
-            filters.add(Filters.eq("etat", state.value()));
+            filters.add(Filters.eq("state", state.value()));
         }
         Bson filter = filters.isEmpty() ? new Document() : Filters.and(filters);
         List<Reservation> list = new ArrayList<>();
-        for (Document d : collection().find(filter).sort(Sorts.descending("creee_le"))
+        for (Document d : collection().find(filter).sort(Sorts.descending("created_at"))
                 .limit(Math.max(1, Math.min(MAX_LIMIT, limit)))) {
             list.add(ActivityMapper.toReservation(d));
         }
@@ -103,13 +103,13 @@ public class MongoReservationRepository implements ReservationRepository {
     @Override
     public Optional<Reservation> findOpenByUser(String userId) {
         return ApiIds.fromApi(ApiIds.USER, userId)
-                .map(u -> collection().find(Filters.and(Filters.eq("utilisateur", u), openFilter())).first())
+                .map(u -> collection().find(Filters.and(Filters.eq("user", u), openFilter())).first())
                 .map(ActivityMapper::toReservation);
     }
 
     @Override
     public Optional<Reservation> findOpenBySpot(String spotId) {
-        return Optional.ofNullable(collection().find(Filters.and(Filters.eq("place", spotId), openFilter())).first())
+        return Optional.ofNullable(collection().find(Filters.and(Filters.eq("spot", spotId), openFilter())).first())
                 .map(ActivityMapper::toReservation);
     }
 
@@ -127,7 +127,7 @@ public class MongoReservationRepository implements ReservationRepository {
         ObjectId id = ApiIds.require(ApiIds.RESERVATION, r.id());
         try {
             return collection().replaceOne(
-                    Filters.and(Filters.eq("_id", id), Filters.eq("etat", expectedState.value())),
+                    Filters.and(Filters.eq("_id", id), Filters.eq("state", expectedState.value())),
                     ActivityMapper.toDocument(r, id)).getMatchedCount() == 1;
         } catch (MongoWriteException e) {
             throw translate(e);

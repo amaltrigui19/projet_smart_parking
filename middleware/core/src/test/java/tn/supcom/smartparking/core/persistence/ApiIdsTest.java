@@ -37,7 +37,7 @@ class ApiIdsTest {
     @Test
     void openReservationsFilter() {
         // must stay identical to the partial filter in server/mongo/index.js
-        assertEquals("{\"etat\": {\"$in\": [\"active\", \"in_progress\"]}}",
+        assertEquals("{\"state\": {\"$in\": [\"active\", \"in_progress\"]}}",
                 MongoReservationRepository.openFilter().toBsonDocument().toJson());
     }
 }

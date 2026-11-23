@@ -28,10 +28,10 @@ function indexUtilise(curseur) {
 
 // ---------- 1. Index présents ----------
 const attendus = {
-  autorisations: ["utilisateur_type"],
-  reservations: ["utilisateur_creee_le", "place_etat", "utilisateur_ouverte_unique", "place_ouverte_unique"],
-  evenements: ["traite_debut", "type_debut"],
-  utilisateurs: ["email_unique"],
+  permissions: ["user_type"],
+  reservations: ["user_created_at", "spot_state", "user_open_unique", "spot_open_unique"],
+  events: ["handled_start", "type_start"],
+  users: ["email_unique"],
 };
 for (const [c, noms] of Object.entries(attendus)) {
   const presents = db.getCollection(c).getIndexes().map((i) => i.name);
@@ -39,18 +39,18 @@ for (const [c, noms] of Object.entries(attendus)) {
 }
 
 // ---------- 2. Les requêtes de l'API utilisent les index ----------
-const sara = db.utilisateurs.findOne({ email: "sara@exemple.tn" });
+const sara = db.users.findOne({ email: "sara@exemple.tn" });
 if (!sara) {
   print("Pas de conducteur d'exemple : lancer d'abord exemples.js.");
   quit(1);
 }
 const u = sara._id;
 const requetes = [
-  ["GET /api/reservations (mon historique)", db.reservations.find({ utilisateur: u }).sort({ creee_le: -1 }).limit(20), "utilisateur_creee_le"],
-  ["réservation ouverte d'une place (plan)", db.reservations.find({ place: "B3", etat: { $in: ["active", "en_cours"] } }), ["place_etat", "place_ouverte_unique"]],
-  ["autorisation pmr d'un conducteur", db.autorisations.find({ utilisateur: u, type: "pmr" }), "utilisateur_type"],
-  ["GET /api/evenements?traite=false", db.evenements.find({ traite: false }).sort({ debut: -1 }).limit(50), "traite_debut"],
-  ["GET /api/evenements?type=cheval&du=…", db.evenements.find({ type: "cheval", debut: { $gte: new Date(Date.now() - 86400000) } }).sort({ debut: -1 }), "type_debut"],
+  ["GET /api/reservations (mon historique)", db.reservations.find({ user: u }).sort({ created_at: -1 }).limit(20), "user_created_at"],
+  ["réservation ouverte d'une place (plan)", db.reservations.find({ spot: "B3", state: { $in: ["active", "in_progress"] } }), ["spot_state", "spot_open_unique"]],
+  ["autorisation accessible d'un conducteur", db.permissions.find({ user: u, type: "accessible" }), "user_type"],
+  ["GET /api/events?handled=false", db.events.find({ handled: false }).sort({ start: -1 }).limit(50), "handled_start"],
+  ["GET /api/events?type=straddling&from=…", db.events.find({ type: "straddling", start: { $gte: new Date(Date.now() - 86400000) } }).sort({ start: -1 }), "type_start"],
 ];
 for (const [description, curseur, index] of requetes) {
   const utilise = indexUtilise(curseur);
@@ -62,10 +62,10 @@ for (const [description, curseur, index] of requetes) {
 const ID_TEST = [ObjectId("64e0000000000000000bff01"), ObjectId("64e0000000000000000bff02")];
 db.reservations.deleteMany({ _id: { $in: ID_TEST } });
 const maintenant = new Date();
-const base = { creee_le: maintenant, expire_le: new Date(maintenant.getTime() + 15 * 60000), debut: null, fin: null,
-  montant: null, devise: null, paiement: null };
+const base = { created_at: maintenant, expires_at: new Date(maintenant.getTime() + 15 * 60000), start: null, end: null,
+  amount: null, currency: null, payment: null };
 
-const ouverteSara = db.reservations.findOne({ utilisateur: u, etat: { $in: ["active", "en_cours"] } });
+const ouverteSara = db.reservations.findOne({ user: u, state: { $in: ["active", "in_progress"] } });
 verifier("Sara a une réservation ouverte (exemples.js)", ouverteSara !== null);
 
 function refusee(doc, index) {
@@ -76,14 +76,14 @@ function refusee(doc, index) {
     return e.code === 11000 && e.message.includes(index);
   }
 }
-verifier("2e réservation active du même conducteur refusée (utilisateur_ouverte_unique)",
-  refusee({ _id: ID_TEST[0], utilisateur: u, place: "A4", etat: "active", ...base }, "utilisateur_ouverte_unique"));
-verifier("réservation active sur une place déjà réservée refusée (place_ouverte_unique)",
-  refusee({ _id: ID_TEST[1], utilisateur: new ObjectId(), place: ouverteSara ? ouverteSara.place : "B3", etat: "active", ...base }, "place_ouverte_unique"));
+verifier("2e réservation active du même conducteur refusée (user_open_unique)",
+  refusee({ _id: ID_TEST[0], user: u, spot: "A4", state: "active", ...base }, "user_open_unique"));
+verifier("réservation active sur une place déjà réservée refusée (spot_open_unique)",
+  refusee({ _id: ID_TEST[1], user: new ObjectId(), spot: ouverteSara ? ouverteSara.spot : "B3", state: "active", ...base }, "spot_open_unique"));
 
 let accepte = true;
 try {
-  db.reservations.insertOne({ _id: ID_TEST[0], utilisateur: u, place: "A4", etat: "terminee", ...base });
+  db.reservations.insertOne({ _id: ID_TEST[0], user: u, spot: "A4", state: "completed", ...base });
 } catch (e) { accepte = false; }
 verifier("une réservation terminée du même conducteur reste acceptée (index partiel)", accepte);
 
