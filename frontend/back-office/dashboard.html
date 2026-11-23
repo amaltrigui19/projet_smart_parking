@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr" data-app="back-office" data-service-worker="/admin/service-worker.js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tableau de bord · Back office · Smart Parking</title>
+  <meta name="theme-color" content="#0b5d5d">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="/admin/manifest.json">
+  <link rel="icon" href="/shared/icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/shared/css/base.css">
+</head>
+<!-- Hidden until the session is checked (shared/js/protected-page.js). -->
+<body hidden>
+  <header class="app-header">
+    <img src="/shared/icons/icon-192.png" alt="" width="40" height="40">
+    <h1>Smart Parking</h1>
+    <span class="app-label">Back office</span>
+    <span id="network-status" class="badge" role="status">En ligne</span>
+  </header>
+
+  <div class="session-bar">
+    <span>Opérateur · <strong id="user-name"></strong></span>
+    <button id="logout-button" class="button-secondary" type="button">Se déconnecter</button>
+  </div>
+
+  <main>
+    <section class="page-intro">
+      <h2>Back office</h2>
+      <p>Surveillez le parking, configurez les places et suivez les alertes.</p>
+      <div class="cards">
+        <a class="card" href="/admin/live-map.html">
+          <strong>Plan en temps réel</strong>
+          <span>État des places, mis à jour en direct</span>
+        </a>
+        <a class="card" href="/admin/calibration.html">
+          <strong>Calibration des places</strong>
+          <span>Dessiner les places et les zones interdites sur la photo du Pi</span>
+        </a>
+        <a class="card" href="#alerts" aria-disabled="true">
+          <strong>Alertes</strong>
+          <span>Anomalies détectées par la caméra (sprint 8)</span>
+        </a>
+        <a class="card" href="#users" aria-disabled="true">
+          <strong>Comptes et autorisations</strong>
+          <span>Conducteurs, opérateurs, autorisations PMR et électriques (sprint 6)</span>
+        </a>
+        <a class="card" href="#stats" aria-disabled="true">
+          <strong>Statistiques</strong>
+          <span>Occupation, heures de pointe, infractions (sprint 9)</span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">Smart Parking · Back office · SUP'COM</footer>
+
+  <script type="module" src="/shared/js/pwa.js"></script>
+  <script type="module" src="/shared/js/protected-page.js"></script>
+</body>
+</html>

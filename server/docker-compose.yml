@@ -4,14 +4,15 @@
 #
 #   cd server
 #   cp .env.example .env        # puis remplir les mots de passe
-#   ./scripts/generer-certificats.sh
+#   ./scripts/generate-certificates.sh
+#   ./scripts/generate-jwt-keys.sh
 #   docker compose up -d --build
 
 name: smartparking
 
 services:
 
-  # Reverse proxy HTTPS : sert la PWA et transmet /api à WildFly
+  # Reverse proxy HTTPS : sert les deux frontends et transmet /api à WildFly
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
@@ -26,65 +27,71 @@ services:
     depends_on:
       - wildfly
 
-  # Broker MQTT en TLS (8883), comptes « pi » et « serveur » avec mot de passe
+  # Broker MQTT en TLS (8883), comptes « pi » et « server » avec mot de passe
   mqtt:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.0.23
     restart: unless-stopped
     ports:
       - "8883:8883"
     environment:
-      MQTT_MDP_PI: ${MQTT_MDP_PI:?à définir dans .env}
-      MQTT_MDP_SERVEUR: ${MQTT_MDP_SERVEUR:?à définir dans .env}
-    command: ["sh", "/mosquitto/config/demarrer.sh"]
+      MQTT_PASSWORD_PI: ${MQTT_PASSWORD_PI:?à définir dans .env}
+      MQTT_PASSWORD_SERVER: ${MQTT_PASSWORD_SERVER:?à définir dans .env}
+    command: ["sh", "/mosquitto/config/start.sh"]
     volumes:
       - ./mosquitto:/mosquitto/config:ro
       - ./certs:/mosquitto/certs:ro
-      - mqtt-donnees:/mosquitto/data
+      - mqtt-data:/mosquitto/data
 
   # Base de données, données gardées dans un volume Docker
   mongo:
-    image: mongo:8.0
+    image: mongo:8.0.38
     restart: unless-stopped
     # Par défaut accessible seulement depuis la machine elle-même (voir .env)
     ports:
-      - "${MONGO_PORT_HOTE:-127.0.0.1:27017}:27017"
+      - "${MONGO_HOST_PORT:-127.0.0.1:27017}:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_UTILISATEUR:?à définir dans .env}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_MOT_DE_PASSE:?à définir dans .env}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?à définir dans .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?à définir dans .env}
     # Cache limité pour tenir sur une VM de 2 Go
     command: ["--wiredTigerCacheSizeGB", "0.25"]
     volumes:
-      - mongo-donnees:/data/db
+      - mongo-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 15s
       timeout: 5s
       retries: 5
 
-  # Serveur d'application Jakarta EE (application de test : GET /api/sante)
+  # Serveur d'application Jakarta EE : api.war (API REST + module IAM), GET /api/health
   wildfly:
+    # Sur la VM : image construite par GitHub Actions et téléchargée depuis GHCR (WILDFLY_IMAGE est
+    # écrit dans .env par scripts/deploy.sh). En local : non défini, « docker compose up -d --build » la construit.
+    image: ${WILDFLY_IMAGE:-smartparking-wildfly:local}
     build: ../middleware
     restart: unless-stopped
     # Pas de port publié : on passe toujours par Nginx en HTTPS
     environment:
-      MONGO_HOTE: mongo
-      MONGO_UTILISATEUR: ${MONGO_UTILISATEUR}
-      MONGO_MOT_DE_PASSE: ${MONGO_MOT_DE_PASSE}
-      MQTT_HOTE: mqtt
-      MQTT_MDP_SERVEUR: ${MQTT_MDP_SERVEUR}
-      # JWT (contrat §2.2) : clé privée pour signer ; la clé publique est lue par MicroProfile JWT
-      # dans le même dossier (middleware/api/.../microprofile-config.properties)
-      JWT_CLE_PRIVEE_FICHIER: /opt/smartparking/jwt/privee.pem
-      # Compte exploitant de démo, créé au démarrage s'il n'existe pas (laisser vide pour ne rien créer)
-      EXPLOITANT_EMAIL: ${EXPLOITANT_EMAIL:-}
-      EXPLOITANT_MOT_DE_PASSE: ${EXPLOITANT_MOT_DE_PASSE:-}
+      MONGO_HOST: mongo
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MQTT_HOST: mqtt
+      MQTT_PASSWORD_SERVER: ${MQTT_PASSWORD_SERVER}
+      # JWT (contrat §2.2) : dossier des clés <kid>.pem créées par scripts/generate-jwt-keys.sh.
+      # L'IAM signe avec la plus récente et publie toutes les clés publiques sur /.well-known/jwks.json.
+      JWT_KEYS_DIR: /opt/smartparking/jwt/keys
+      # Compte OPERATOR de démo, créé au démarrage s'il n'existe pas (laisser vide pour ne rien créer)
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL:-}
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
     volumes:
-      # Clés générées par scripts/generer-cles-jwt.sh (dossier jwt/, ignoré par Git)
+      # Dossier jwt/ (ignoré par Git)
       - ./jwt:/opt/smartparking/jwt:ro
     depends_on:
       - mongo
       - mqtt
 
+# Noms Docker fixés : ce sont les volumes déjà créés sur la VM (données conservées).
 volumes:
-  mongo-donnees:
-  mqtt-donnees:
+  mongo-data:
+    name: smartparking_mongo-donnees
+  mqtt-data:
+    name: smartparking_mqtt-donnees

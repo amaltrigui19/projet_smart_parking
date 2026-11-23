@@ -1,0 +1,124 @@
+# Continuous deployment: after CI succeeds on main, build the WildFly image, push it to GHCR
+# and deploy it on the VM over SSH. Can also be started by hand (Actions → Deploy → Run workflow).
+#
+# Required secrets (Settings → Secrets and variables → Actions), see server/README.md (CI/CD):
+#   VM_HOST              smartparking-supcom.duckdns.org
+#   VM_USER              ubuntu
+#   VM_SSH_KEY           private key allowed to log in to the VM (dedicated deploy key)
+#   VM_SSH_KNOWN_HOSTS   output of `ssh-keyscan -t ed25519 smartparking-supcom.duckdns.org`
+
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Never two deployments at the same time; a newer one waits for the current one to finish.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: Build and push the image
+    # Only after a green CI run triggered by a push on main (not by a PR), or when started by hand.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.names.outputs.image }}
+      sha: ${{ steps.names.outputs.sha }}
+    steps:
+      - name: Choose the commit and the image name
+        id: names
+        run: |
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          # GHCR names must be lowercase.
+          repo="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "repo=ghcr.io/$repo/wildfly" >> "$GITHUB_OUTPUT"
+          # Fixed tag = the commit: the VM always runs a known, reproducible image.
+          echo "image=ghcr.io/$repo/wildfly:$sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.names.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The Dockerfile runs the JUnit tests: a red test means no image.
+      - uses: docker/build-push-action@v6
+        with:
+          context: middleware
+          push: true
+          tags: |
+            ${{ steps.names.outputs.image }}
+            ${{ steps.names.outputs.repo }}:main
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.names.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy on the VM
+    needs: image
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: https://smartparking-supcom.duckdns.org
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Prepare the SSH key
+        env:
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_SSH_KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Known host key from the secrets: no blind "yes" to an unknown server.
+          printf '%s\n' "$VM_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Update the code, pull the image and restart
+        env:
+          VM: ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}
+          IMAGE: ${{ needs.image.outputs.image }}
+          SHA: ${{ needs.image.outputs.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh_vm() { ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 "$VM" "$@"; }
+
+          # Temporary login: the token is only valid during this job, and is removed at the end.
+          printf '%s' "$GHCR_TOKEN" | ssh_vm "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          trap 'ssh_vm "docker logout ghcr.io" || true' EXIT
+
+          # Fast-forward only: if someone changed tracked files on the VM, stop instead of overwriting them.
+          ssh_vm "cd /opt/smartparking && git fetch --quiet origin main && git merge --ff-only --quiet '$SHA' \
+                  && bash server/scripts/deploy.sh '$IMAGE'"
+
+      - name: Check the public site
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors https://smartparking-supcom.duckdns.org/api/health
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy

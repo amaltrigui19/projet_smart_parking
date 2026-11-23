@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr" data-app="back-office" data-service-worker="/admin/service-worker.js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calibration des places · Back office · Smart Parking</title>
+  <meta name="theme-color" content="#0b5d5d">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="/admin/manifest.json">
+  <link rel="icon" href="/shared/icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/shared/css/base.css">
+  <link rel="stylesheet" href="/admin/css/calibration.css">
+</head>
+<!-- Hidden until the session is checked (shared/js/protected-page.js). -->
+<body hidden>
+  <header class="app-header">
+    <a href="/admin/dashboard.html" class="logo-link"><img src="/shared/icons/icon-192.png" alt="Tableau de bord" width="40" height="40"></a>
+    <h1>Smart Parking</h1>
+    <span class="app-label">Back office</span>
+    <span id="network-status" class="badge" role="status">En ligne</span>
+  </header>
+
+  <div class="session-bar">
+    <span>Calibration · <strong id="user-name"></strong></span>
+    <button id="logout-button" class="button-secondary" type="button">Se déconnecter</button>
+  </div>
+
+  <main class="calibration">
+    <h2>Calibration des places</h2>
+    <p class="intro">Dessine chaque place et chaque zone interdite sur la photo de référence prise par le Pi, puis enregistre-les sur le serveur (ou exporte le fichier <code>places.json</code>).</p>
+
+    <div class="calibration-grid">
+      <div>
+        <div class="drawing-area">
+          <p id="empty-state" class="empty">Aucune photo chargée.</p>
+          <canvas id="canvas" hidden aria-label="Photo de la maquette : clique sur les coins des places"></canvas>
+        </div>
+        <p id="resolution-info" class="info"></p>
+        <div class="toolbar">
+          <button id="undo-point-button" class="button-secondary" type="button">Annuler le dernier point</button>
+          <button id="close-polygon-button" class="button" type="button">Fermer le polygone</button>
+          <button id="clear-button" class="button-secondary" type="button">Effacer le tracé</button>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <label class="button file-button">
+          Choisir la photo
+          <input id="photo-input" type="file" accept="image/*" class="visually-hidden">
+        </label>
+        <p id="hint" class="hint" role="status"></p>
+
+        <form id="element-form" class="element-form" hidden novalidate>
+          <fieldset class="category">
+            <legend>Ce polygone est</legend>
+            <label><input type="radio" name="category" value="spot" checked> une place</label>
+            <label><input type="radio" name="category" value="zone"> une zone interdite</label>
+          </fieldset>
+          <label>Nom
+            <input id="id-input" type="text" autocomplete="off" spellcheck="false">
+          </label>
+          <div id="spot-fields" class="spot-fields">
+            <label>Type
+              <select id="type-input">
+                <option value="standard">standard</option>
+                <option value="accessible">accessible (PMR)</option>
+                <option value="electric">electric (électrique)</option>
+              </select>
+            </label>
+            <label>Durée maximale (minutes)
+              <input id="duration-input" type="number" min="1" step="1" inputmode="numeric">
+            </label>
+          </div>
+          <p id="form-message" class="error-text" role="alert"></p>
+          <div class="toolbar">
+            <button class="button" type="submit">Enregistrer</button>
+            <button id="edit-outline-button" class="button-secondary" type="button">Modifier le tracé</button>
+            <button id="cancel-form-button" class="button-secondary" type="button">Annuler</button>
+          </div>
+        </form>
+
+        <h3>Éléments dessinés</h3>
+        <p id="counter" class="info"></p>
+        <ul id="element-list" class="element-list"></ul>
+        <div class="toolbar">
+          <button id="save-button" class="button" type="button">Enregistrer sur le serveur</button>
+          <button id="export-button" class="button-secondary" type="button">Exporter places.json</button>
+        </div>
+        <div id="server-message" class="server-message" role="status" aria-live="polite"></div>
+      </aside>
+    </div>
+  </main>
+
+  <script src="/admin/js/spot-validation.js"></script>
+  <script type="module" src="/shared/js/pwa.js"></script>
+  <script type="module" src="/shared/js/protected-page.js"></script>
+  <script type="module" src="/admin/js/calibration.js"></script>
+</body>
+</html>

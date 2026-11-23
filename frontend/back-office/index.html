@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr" data-app="back-office" data-service-worker="/admin/service-worker.js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Back office · Smart Parking</title>
+  <meta name="theme-color" content="#0b5d5d">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="/admin/manifest.json">
+  <link rel="icon" href="/shared/icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/shared/css/base.css">
+</head>
+<body>
+  <header class="app-header">
+    <img src="/shared/icons/icon-192.png" alt="" width="40" height="40">
+    <h1>Smart Parking</h1>
+    <span class="app-label">Back office</span>
+    <span id="network-status" class="badge" role="status">En ligne</span>
+  </header>
+
+  <main>
+    <section class="auth-panel">
+      <h2>Connexion opérateur</h2>
+      <div id="auth-message" class="message" role="status" aria-live="polite" hidden></div>
+
+      <form id="login-form" class="form" novalidate>
+        <label>Email
+          <input name="email" type="email" autocomplete="username" required>
+        </label>
+        <label>Mot de passe
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="button" type="submit">Se connecter</button>
+        <p class="note">Réservé aux opérateurs du parking. Les comptes opérateur sont créés par l'administrateur.
+          Conducteur ? Allez sur l'<a href="/">application conducteur</a>.</p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="app-footer">Smart Parking · Back office · SUP'COM</footer>
+
+  <script type="module" src="/shared/js/pwa.js"></script>
+  <script type="module" src="/admin/js/login.js"></script>
+</body>
+</html>

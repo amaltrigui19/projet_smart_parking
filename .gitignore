@@ -18,7 +18,7 @@ iot/places.json
 # Serveur (server/) : certificats, clés et secrets jamais dans Git
 server/certs/
 server/certbot-www/
-# Clés RSA des JWT (scripts/generer-cles-jwt.sh) : la clé privée signe les jetons
+# Clés RSA des JWT (scripts/generate-jwt-keys.sh, server/jwt/keys/<kid>.pem) : les clés privées signent les jetons
 server/jwt/
 *.pem
 *.key
