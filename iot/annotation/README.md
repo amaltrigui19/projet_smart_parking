@@ -16,6 +16,11 @@ Le **lot 1** est terminé et rangé dans le dossier Google Drive de l'équipe (s
 | `verifier_dataset.py` | Contrôle un lot (format, doublons) et affiche les statistiques ; code 1 en cas d'erreur |
 | `generer_synthetique.py` | Génère le **lot 3 synthétique** : la maquette vue du dessus, avec des boîtes exactes (section 4) |
 | `decouper_dataset.py` | Réunit les lots et les découpe en entraînement / validation / test, de façon stable (section 5) |
+| `telecharger_roboflow.py` | Télécharge une source Roboflow du lot 1 (toy-car, CARPK) avec la clé de `iot/.env` (section 6) |
+| `vues_toycar.csv`, `exclusions_toycar.txt`, `corrections/` | Tri et corrections manuelles des images toy-car du lot 1 (section 6) |
+| `generer_lot2.py` | Génère le **lot 2 synthétique** : vraies voitures miniatures collées sur la maquette dessinée (section 6) |
+| `exclusions_decoupes.txt` | Voitures découpées écartées par `generer_lot2.py` |
+| `archiver_lot.py` | Archive un lot vérifié en `.zip` avec manifeste et empreintes, et le restaure en contrôlant chaque fichier |
 
 Toutes les commandes se lancent **depuis la racine du dépôt** (cmd, PowerShell ou Git Bash).
 
@@ -183,7 +188,7 @@ Les lots sont réunis puis découpés en trois parties, **sans modifier les lots
 
 ### 5.1 Préparer et découper
 
-1. Récupérer les lots 1 et 2 depuis le Drive et les extraire dans `iot/dataset/` ; générer le lot 3 (section 4.1).
+1. Récupérer les lots 1 et 2 depuis le Drive et les extraire dans `iot/dataset/` (ou les reconstruire, section 6) ; générer le lot 3 (section 4.1).
 2. Découper, puis vérifier chaque partie :
    ```
    python iot/annotation/decouper_dataset.py
@@ -202,3 +207,64 @@ Chaque image est placée d'après l'empreinte SHA-256 de son **nom**, et non par
 - **chaque source est répartie dans les mêmes proportions** (toycar, carpk, synth, maquette…).
 
 Le script refuse deux images de même nom dans deux lots : les préfixes de fichiers doivent rester uniques (`synth_lot3_`, `maquette_`…). Les variantes d'une même photo ne doivent pas être séparées : le lot 1 n'en garde déjà qu'une par photo d'origine.
+---
+
+## 6. Reconstruire le dataset depuis zéro
+
+Le dataset n'est pas versionné : n'importe quel membre de l'équipe (ou un ingénieur qui nous rejoint) doit pouvoir le **reconstruire à tout moment**. Les lots dépendent les uns des autres, il faut donc suivre cet ordre :
+
+```
+lot 1 (Drive ou Roboflow)  ->  découpes des voitures  ->  lot 2  ->  lot 3  ->  découpage train / val / test
+```
+
+| Lot | Auteur | Contenu | Reconstruction | Résultat attendu (`verifier_dataset.py`) |
+|---|---|---|---|---|
+| 1 | Maissa | toy-car, CARPK, photos de test | Archive du Drive (recommandé) ou Roboflow + Label Studio | `TOTAL 174 images, 5212 voitures` |
+| 2 | Eya | 300 scènes synthétiques, voitures réelles collées | `generer_lot2.py`, graine 0 | `TOTAL 300 images, 1250 voitures` |
+| 3 | Amal | 300 scènes synthétiques dessinées | `generer_synthetique.py`, graine 3 | `TOTAL 300 images, 1382 voitures` |
+
+Les lots 2 et 3 sont **reproductibles au bit près** : même graine, mêmes images, mêmes labels, sur tous les PC (vérifié le 23/11/2026 en régénérant le lot 2 et en comparant les empreintes des 300 images avec l'archive `lot2_2026-11-16.zip`).
+
+### 6.1 Lot 1
+
+**Le plus simple** : télécharger `lot1_<date>.zip` depuis le Drive (section 2) et le restaurer, ce qui contrôle chaque fichier avec le manifeste :
+
+```
+python iot/annotation/archiver_lot.py restaurer --zip "<chemin>/lot1_2026-11-16_toycar-carpk.zip"
+python iot/annotation/verifier_dataset.py --dossier iot/dataset/lot1
+```
+
+**Sans le Drive** (depuis les sources d'origine). Il faut une clé API Roboflow dans `iot/.env` (copier `iot/.env.exemple`) :
+
+```
+python iot/annotation/telecharger_roboflow.py --projet parkitnowprototype/toy-car-detection-f5tno --version 4 --sortie iot/dataset/sources/toycar_v4
+python iot/annotation/telecharger_roboflow.py --projet <votre-workspace>/carpk-2-xxxxx --version 1 --sortie iot/dataset/sources/carpk_v1
+python iot/annotation/preparer_datasets.py --source iot/dataset/sources/toycar_v4 --nom toycar --classes-a-garder toycar --une-variante-par-origine --ignorer-vides --exclusions iot/annotation/exclusions_toycar.txt --corrections iot/annotation/corrections
+python iot/annotation/preparer_datasets.py --source iot/dataset/sources/carpk_v1 --nom carpk --echantillon 80
+```
+
+Le projet CARPK est un fork dans son propre workspace Roboflow (voir l'historique Git de ce README, commit `66508a8^`, pour la procédure détaillée). Les 21 photos de test (`photos_`) se refont avec la chaîne de la section 3 : **c'est la seule partie manuelle**, d'où l'intérêt de l'archive du Drive.
+
+### 6.2 Lot 2
+
+Il a besoin des images `toycar_` du lot 1 (pour y découper les voitures) :
+
+```
+python iot/annotation/generer_lot2.py decouper
+python iot/annotation/generer_lot2.py generer --nombre 300 --graine 0 --sortie iot/dataset/sources/synth_v1 --remplacer
+python iot/annotation/preparer_datasets.py --source iot/dataset/sources/synth_v1 --nom synth --sortie iot/dataset/lot2 --seuil-doublons 0
+python iot/annotation/verifier_dataset.py --dossier iot/dataset/lot2 --apercu 12
+```
+
+- `decouper` produit 18 voitures détourées dans `iot/dataset/synthetique/voitures/` et une planche de contrôle ; 4 découpes sont écartées (`exclusions_decoupes.txt`).
+- `generer` écrit aussi `scenes.jsonl` : vérité terrain de chaque image (places recouvertes, zone interdite, homographie cm → pixels).
+- Optionnel : `python iot/annotation/generer_lot2.py plan` produit la vue de la caméra à vide, le `places.json` correspondant et le plan de la maquette à imprimer en A4.
+
+### 6.3 Lot 3 et découpage
+
+```
+python iot/annotation/generer_synthetique.py --nombre 300
+python iot/annotation/decouper_dataset.py
+```
+
+Voir les sections 4.1 et 5.1 pour les vérifications.

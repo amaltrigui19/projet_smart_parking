@@ -1,0 +1,5 @@
+# Voitures découpées non utilisées par generer_lot2.py (une par ligne).
+# Format : <origine>_<numéro de la boîte>  # raison   (nom du PNG sans extension)
+toy-car-20-Copy_jpeg_0  # voiture couchée sur le côté (roues visibles) : pas une vue du dessus
+toy-car-42-Copy_jpeg_0  # voiture couchée sur le côté (roues visibles) : pas une vue du dessus
+toy-car-27-Copy_jpeg_0  # découpe coupée sur un côté
