@@ -79,7 +79,7 @@ Procédure complète : [`docs/installation-serveur.md`](../docs/installation-ser
 
 ## Tester
 
-**Tests unitaires** (57 tests : 6 dans `core`, 31 dans `iam` pour le hachage, le JWT et les entrées, 20 dans `api` pour la validation et la conversion des polygones), sans Java ni Maven sur le PC :
+**Tests unitaires** (80 tests : 29 dans `core` pour la conversion Java ↔ MongoDB, les identifiants et les modèles, 31 dans `iam` pour le hachage, le JWT et les entrées, 20 dans `api` pour la validation et la conversion des polygones), sans Java ni Maven sur le PC :
 
 ```bash
 docker run --rm -v "$PWD/middleware:/src" -v smartparking-m2:/root/.m2 -w /src maven:3.9-eclipse-temurin-21 mvn -B test
@@ -227,5 +227,49 @@ Résultat attendu : `Seed terminé : 1 parking, 8 places.`, puis 8 lignes de pla
 ### Tests
 
 ```bash
-cd middleware && mvn test     # 6 tests de conversion Java ↔ MongoDB, sans base
+cd middleware && mvn test     # 29 tests dans core (conversion, identifiants, modèles), sans base
 ```
+
+## Base MongoDB : schéma 2 (sprint 4)
+
+Collections `autorisations`, `reservations` et `evenements` du contrat §2.14, dans `core/`. La collection `utilisateurs` existe déjà depuis le sprint 3 (`iam/DepotUtilisateurs`). Les routes qui les utilisent viennent aux sprints 6 à 8 : ce sprint prépare le modèle, l'accès aux données et les index.
+
+| Classe | Rôle |
+|---|---|
+| `modele/Autorisation`, `TypeAutorisation` | Autorisation `pmr` / `electrique`, `valideLe(instant)` (début inclus, fin exclue, `fin = null` = sans fin) |
+| `modele/Reservation`, `EtatReservation`, `Paiement` | États du contrat §2.8 ; `EtatReservation.OUVERTS` = `active`, `en_cours` |
+| `modele/Evenement`, `TypeEvenement`, `SourceEvenement` | Anomalies `cheval`, `zone_interdite` (Pi), `ventouse`, `place_speciale` (serveur) |
+| `donnees/Identifiants` | `ObjectId` en base ↔ `u_…`, `r_…`, `evt_…`, `aut_…` dans l'API |
+| `donnees/ConversionActivite` | Traduction Java ↔ documents MongoDB. Les références à un utilisateur (`utilisateur`, `accordee_par`, `traite_par`) sont des `ObjectId`, comme `utilisateurs._id` |
+| `donnees/DepotAutorisations` | `creer`, `duUtilisateur`, `aUneValide(utilisateur, type, instant)`, `supprimer` |
+| `donnees/DepotReservations` | `creer`, `parId`, `lister(utilisateur, etat, limite)`, `ouverteDuUtilisateur`, `ouverteSurPlace`, `ouvertes`, `mettreAJour(r, etatAttendu)` |
+| `donnees/DepotEvenements` | `creer`, `parId`, `lister(traite, type, du, au, limite)`, `nombreNonTraites`, `marquerTraite`, `terminer` |
+
+### Index
+
+| Collection | Index | Pour |
+|---|---|---|
+| `autorisations` | `utilisateur_type` : `{utilisateur, type}` | « ce conducteur a-t-il une autorisation PMR ? » |
+| `reservations` | `utilisateur_creee_le` : `{utilisateur, creee_le: -1}` | `GET /api/reservations` (historique, du plus récent au plus ancien) |
+| `reservations` | `place_etat` : `{place, etat}` | réservations d'une place (plan : place réservée) |
+| `reservations` | `utilisateur_ouverte_unique` : `{utilisateur}` unique, **partiel** sur `etat ∈ {active, en_cours}` | une seule réservation ouverte par conducteur → `409 reservation_deja_active` |
+| `reservations` | `place_ouverte_unique` : `{place}` unique, **partiel** sur `etat ∈ {active, en_cours}` | une seule réservation ouverte par place → `409 place_indisponible` |
+| `evenements` | `traite_debut` : `{traite, debut: -1}` | alertes non traitées |
+| `evenements` | `type_debut` : `{type, debut: -1}` | filtre par type et par date |
+
+Les deux index uniques partiels ne sont pas dans le contrat : ils font respecter les règles du §2.8 **par la base**, même si deux requêtes arrivent en même temps. `DepotReservations` les traduit en `ReservationEnConflit` (motif `UTILISATEUR` ou `PLACE`), que l'API traduira en `409`. Une réservation terminée, payée, annulée ou expirée n'est pas concernée : l'historique peut en contenir autant qu'on veut.
+
+Les index sont créés par les DAO au premier accès **et** par `server/mongo/index.js`, avec les mêmes noms et options. Si on en change un, il faut changer l'autre : sinon MongoDB refuse avec `IndexOptionsConflict`.
+
+### Données d'exemple et vérification
+
+Après `seed.js` (P1 et ses places), depuis la racine du dépôt :
+
+```bash
+./server/scripts/executer-mongo.sh server/mongo/index.js            # crée et liste les index
+./server/scripts/executer-mongo.sh server/mongo/exemples.js         # 2 conducteurs, 1 autorisation, 4 réservations, 4 événements
+./server/scripts/executer-mongo.sh server/mongo/verifier-schema.js  # index utilisés par les requêtes, unicité des réservations ouvertes
+```
+
+- `exemples.js` est relançable (identifiants fixes, upsert ; les dates sont recalculées par rapport à maintenant). Il crée deux conducteurs `sara@exemple.tn` et `youssef@exemple.tn` (mot de passe de test dans le script), une autorisation PMR pour Sara, des réservations dans plusieurs états (dont une **active sur B3**, utile pour le plan SVG) et un événement de chaque type. **Local seulement** : le mot de passe est connu, ne pas le lancer sur la VM.
+- `verifier-schema.js` vérifie, avec `explain()`, que chaque requête de l'API utilise son index, et que la base refuse une 2ᵉ réservation ouverte. Il ne laisse aucune trace. Résultat attendu : `0 en échec`.

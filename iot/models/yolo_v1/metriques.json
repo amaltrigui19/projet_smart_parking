@@ -1,0 +1,21 @@
+{
+  "modele_depart": "yolo11n.pt",
+  "epochs_max": 50,
+  "patience": 10,
+  "imgsz": 640,
+  "batch": 16,
+  "seed": 42,
+  "ultralytics": "8.4.216",
+  "validation": {
+    "mAP50": 0.9949,
+    "mAP50-95": 0.8987,
+    "precision": 0.9921,
+    "rappel": 0.9906
+  },
+  "test": {
+    "mAP50": 0.9822,
+    "mAP50-95": 0.7842,
+    "precision": 0.9757,
+    "rappel": 0.9592
+  }
+}

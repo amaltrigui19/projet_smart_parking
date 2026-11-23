@@ -22,6 +22,7 @@
 | Authentification PWA (connexion, inscription, redirection selon le rôle, déconnexion) | Claude | Génération du squelette des pages/formulaires de connexion et d'inscription, et de la logique de redirection selon le rôle utilisateur |
 | Calibration des polygones (enregistrement/chargement via l'API, script de relecture pour la démo) | Claude | Aide à l'implémentation de l'enregistrement et du chargement des polygones via l'API, et génération du script de relecture pour la démo |
 | Fausse API locale (mock GET/PUT /api/config/polygones) | Claude | Génération du squelette de l'API mock locale servant à tester la calibration sans dépendre du backend réel |
+| Schéma MongoDB 2 (autorisations, réservations, événements : modèles, DAO, index, données d'exemple) | Claude | Génération des modèles et des DAO du module core à partir du contrat §2.14, des scripts index.js / exemples.js / verifier-schema.js et des tests unitaires ; vérification sur la pile Docker locale |
 
 ---
 
