@@ -23,17 +23,17 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<WebApplica
         boolean anonymous = security == null || security.getUserPrincipal() == null;
         // A protected route called without a valid token: 401 (not logged in), not 403 (wrong role).
         if ((status == 401 || status == 403) && anonymous) {
-            return ErrorResponses.of(401, "non_authentifie", "JWT absent, invalide ou expiré : reconnectez-vous.");
+            return ErrorResponses.of(401, "unauthenticated", "JWT absent, invalide ou expiré : reconnectez-vous.");
         }
         return switch (status) {
-            case 400 -> ErrorResponses.of(400, "requete_invalide", "Requête invalide.");
-            case 403 -> ErrorResponses.of(403, "acces_refuse", "Votre rôle ne permet pas cette action.");
-            case 404 -> ErrorResponses.of(404, "introuvable", "Ressource introuvable.");
-            case 405 -> ErrorResponses.of(405, "methode_non_permise", "Méthode HTTP non permise sur cette route.");
-            case 415 -> ErrorResponses.of(415, "type_non_supporte", "Le corps doit être en JSON (Content-Type: application/json).");
+            case 400 -> ErrorResponses.of(400, "invalid_request", "Requête invalide.");
+            case 403 -> ErrorResponses.of(403, "forbidden", "Votre rôle ne permet pas cette action.");
+            case 404 -> ErrorResponses.of(404, "not_found", "Ressource introuvable.");
+            case 405 -> ErrorResponses.of(405, "method_not_allowed", "Méthode HTTP non permise sur cette route.");
+            case 415 -> ErrorResponses.of(415, "unsupported_media_type", "Le corps doit être en JSON (Content-Type: application/json).");
             default -> status >= 500
-                    ? ErrorResponses.of(500, "erreur_serveur", "Erreur interne du serveur.")
-                    : ErrorResponses.of(status, "requete_invalide", "Requête refusée (" + status + ").");
+                    ? ErrorResponses.of(500, "server_error", "Erreur interne du serveur.")
+                    : ErrorResponses.of(status, "invalid_request", "Requête refusée (" + status + ").");
         };
     }
 }

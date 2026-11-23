@@ -17,10 +17,10 @@ import java.util.Map;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * GET /api/sante: deployment check (contract §2.4). Only checks that MongoDB and the MQTT broker
+ * GET /api/health: deployment check (contract §2.4). Only checks that MongoDB and the MQTT broker
  * accept a TCP connection, without authenticating.
  */
-@Path("/sante")
+@Path("/health")
 @RequestScoped
 @Produces(MediaType.APPLICATION_JSON)
 public class HealthResource {
@@ -32,7 +32,7 @@ public class HealthResource {
     String mongoHost;
 
     @Inject
-    @ConfigProperty(name = "MQTT_HOTE", defaultValue = "mqtt")
+    @ConfigProperty(name = "MQTT_HOST", defaultValue = "mqtt")
     String mqttHost;
 
     @GET
@@ -42,7 +42,7 @@ public class HealthResource {
         boolean ok = "ok".equals(mongo) && "ok".equals(mqtt);
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("statut", ok ? "ok" : "ko");
+        body.put("status", ok ? "ok" : "ko");
         body.put("version", VERSION);
         body.put("mongo", mongo);
         body.put("mqtt", mqtt);

@@ -14,11 +14,10 @@ import tn.supcom.smartparking.JsonBody;
 import tn.supcom.smartparking.core.calibration.CalibrationManager;
 
 /**
- * GET and PUT /api/config/polygones (contract §2.10): the places.json calibration file (§5.2).
+ * GET and PUT /api/config/polygons (contract §2.10): the places.json calibration file (§5.2).
  * Operator only (role OPERATOR). This controller only handles HTTP; the logic lives in {@link CalibrationManager}.
- * The route path stays as in the current contract until the English contract is agreed.
  */
-@Path("/config/polygones")
+@Path("/config/polygons")
 @RequestScoped
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed("OPERATOR")
@@ -27,13 +26,13 @@ public class CalibrationResource {
     @Inject
     CalibrationManager calibrationManager;
 
-    /** → 200 with places.json; 404 introuvable if nothing is stored yet. */
+    /** → 200 with places.json; 404 not_found if nothing is stored yet. */
     @GET
     public JsonObject get() {
         return calibrationManager.getCalibration();
     }
 
-    /** Body: the whole places.json → 200 with the stored file; 400 config_invalide; 404 without parking. */
+    /** Body: the whole places.json → 200 with the stored file; 400 invalid_config; 404 without parking. */
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
     public JsonObject save(String body) {

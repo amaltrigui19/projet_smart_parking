@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Rules of the {@code 400 config_invalide} error of PUT /api/config/polygones (contract §2.10, format §5.2).
+ * Rules of the {@code 400 invalid_config} error of PUT /api/config/polygons (contract §2.10, format §5.2).
  * Same rules as frontend/outils/valider_places.py, the fake API and the calibration page
  * (js/validation-places.js): duplicate id, polygon with fewer than 3 points, outside the resolution or flat,
  * unknown type, max duration ≤ 0, spot missing from the floor plan, wrong parking id.

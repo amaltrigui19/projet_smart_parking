@@ -14,7 +14,7 @@ public abstract class BusinessException extends RuntimeException {
         this.code = code;
     }
 
-    /** Short error code of the contract, e.g. {@code config_invalide}. */
+    /** Short error code of the contract, e.g. {@code invalid_config}. */
     public String code() {
         return code;
     }

@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets;
 @WebServlet("/errors/401")
 public class UnauthenticatedErrorServlet extends HttpServlet {
 
-    private static final byte[] BODY = ("{\"erreur\":\"non_authentifie\","
+    private static final byte[] BODY = ("{\"error\":\"unauthenticated\","
             + "\"message\":\"JWT absent, invalide ou expiré : reconnectez-vous.\"}").getBytes(StandardCharsets.UTF_8);
 
     @Override

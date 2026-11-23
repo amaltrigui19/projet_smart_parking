@@ -8,7 +8,7 @@ import jakarta.json.JsonValue;
 import java.io.StringReader;
 import tn.supcom.smartparking.core.exception.InvalidRequestException;
 
-/** Reads a JSON request body: 400 requete_invalide if it is empty, malformed or not an object. */
+/** Reads a JSON request body: 400 invalid_request if it is empty, malformed or not an object. */
 public final class JsonBody {
 
     private JsonBody() {
