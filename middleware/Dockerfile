@@ -8,6 +8,14 @@ WORKDIR /src
 COPY . .
 RUN mvn -q -B -ntp clean package
 
-# Étape 2 : WildFly avec le WAR déployé sous /api
+# Variante utilisée par GitHub Actions : le WAR est déjà compilé et testé sur le runner
+# (cache Maven de actions/setup-java), ce qui évite de tout retélécharger depuis Maven Central
+# à chaque build (erreurs 429 « Too Many Requests »). Le WAR arrive par un contexte nommé :
+#   docker build --target war-precompile --build-context war=middleware/api/target middleware
+# Cette étape n'est pas construite par défaut (docker compose, build manuel).
+FROM quay.io/wildfly/wildfly:42.0.0.Final-1-jdk21 AS war-precompile
+COPY --from=war api.war /opt/jboss/wildfly/standalone/deployments/api.war
+
+# Étape 2 (cible par défaut) : WildFly avec le WAR déployé sous /api
 FROM quay.io/wildfly/wildfly:42.0.0.Final-1-jdk21
 COPY --from=construction /src/api/target/api.war /opt/jboss/wildfly/standalone/deployments/api.war

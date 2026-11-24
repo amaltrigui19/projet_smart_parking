@@ -26,7 +26,7 @@ Deux workflows dans `.github/workflows/` :
 
 Déroulé d'un déploiement :
 
-1. L'image `ghcr.io/amaltrigui19/projet_smart_parking/wildfly:<commit>` est construite (le `Dockerfile` relance les tests) et envoyée sur GHCR.
+1. L'image `ghcr.io/amaltrigui19/projet_smart_parking/wildfly:<commit>` est construite et envoyée sur GHCR. Le WAR est compilé (tests JUnit compris) sur le runner avec le cache Maven, puis copié dans l'image (cible `war-precompile` du `Dockerfile`) : cela évite les erreurs 429 de Maven Central. Sur un PC ou la VM, `docker build` sans `--target` compile toujours tout dans Docker.
 2. Par SSH, la VM met à jour `/opt/smartparking` sur ce commit (`git merge --ff-only` : si quelqu'un a modifié un fichier suivi sur la VM, le déploiement s'arrête au lieu d'écraser).
 3. `scripts/deploy.sh` écrit `WILDFLY_IMAGE=<image>` dans `.env`, fait `docker compose pull wildfly` puis `up -d --no-build`, recharge Nginx (sa configuration et le `frontend/` viennent du dépôt), attend `/api/health` puis supprime les images inutilisées.
 4. Le workflow vérifie `https://smartparking-supcom.duckdns.org/api/health` depuis Internet.
