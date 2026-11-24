@@ -7,6 +7,11 @@ import jakarta.json.JsonObjectBuilder;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import tn.supcom.smartparking.core.model.ForbiddenZone;
+import tn.supcom.smartparking.core.model.Parking;
+import tn.supcom.smartparking.core.model.PlanRect;
+import tn.supcom.smartparking.core.model.Spot;
+import tn.supcom.smartparking.core.spots.ParkingLayout;
 import tn.supcom.smartparking.core.spots.SpotStateChanged;
 import tn.supcom.smartparking.core.spots.SpotView;
 import tn.supcom.smartparking.core.spots.SpotsSummary;
@@ -49,6 +54,48 @@ final class SpotJson {
             b.addNull("lock");
         }
         return b.build();
+    }
+
+    /** GET /api/parking (contract §4.3). {@code graph} stays null until the guidance (sprint 7). */
+    static JsonObject layout(ParkingLayout layout) {
+        Parking p = layout.parking();
+        JsonArrayBuilder spots = Json.createArrayBuilder();
+        for (Spot s : layout.spots()) {
+            JsonObjectBuilder b = Json.createObjectBuilder().add("id", s.id()).add("type", s.type().value());
+            addRect(b, s.planRect());
+            if (s.graphNode() == null) {
+                b.addNull("node");
+            } else {
+                b.add("node", s.graphNode());
+            }
+            spots.add(b);
+        }
+        JsonArrayBuilder zones = Json.createArrayBuilder();
+        for (ForbiddenZone z : p.forbiddenZones()) {
+            JsonObjectBuilder b = Json.createObjectBuilder().add("id", z.id());
+            addRect(b, z.planRect());
+            zones.add(b);
+        }
+        JsonObjectBuilder b = Json.createObjectBuilder().add("parking", p.id());
+        if (p.name() == null) {
+            b.addNull("name");
+        } else {
+            b.add("name", p.name());
+        }
+        return b.add("dimensions_cm", Json.createArrayBuilder().add(p.widthCm()).add(p.heightCm()))
+                .add("spots", spots)
+                .add("forbidden_zones", zones)
+                .addNull("graph")
+                .build();
+    }
+
+    /** rect_cm = [x, y, width, height] in cm, or null while the plan is not entered. */
+    private static void addRect(JsonObjectBuilder b, PlanRect r) {
+        if (r == null) {
+            b.addNull("rect_cm");
+        } else {
+            b.add("rect_cm", Json.createArrayBuilder().add(r.x()).add(r.y()).add(r.width()).add(r.height()));
+        }
     }
 
     /** WebSocket message: {"spot": "A3", "state": "occupied", "since": "…"} (contract §1.4). */

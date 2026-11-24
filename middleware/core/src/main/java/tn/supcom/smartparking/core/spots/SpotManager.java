@@ -14,9 +14,11 @@ import java.util.function.Consumer;
 import tn.supcom.smartparking.core.config.ParkingSettings;
 import tn.supcom.smartparking.core.exception.InvalidRequestException;
 import tn.supcom.smartparking.core.exception.NotFoundException;
+import tn.supcom.smartparking.core.model.Parking;
 import tn.supcom.smartparking.core.model.Reservation;
 import tn.supcom.smartparking.core.model.Spot;
 import tn.supcom.smartparking.core.model.SpotState;
+import tn.supcom.smartparking.core.persistence.ParkingRepository;
 import tn.supcom.smartparking.core.persistence.ReservationRepository;
 import tn.supcom.smartparking.core.persistence.SpotRepository;
 
@@ -35,6 +37,9 @@ public class SpotManager {
     ReservationRepository reservationRepository;
 
     @Inject
+    ParkingRepository parkingRepository;
+
+    @Inject
     ParkingSettings settings;
 
     @Inject
@@ -49,10 +54,11 @@ public class SpotManager {
     }
 
     /** For unit tests: no CDI, events go to {@code notifier}. */
-    public SpotManager(SpotRepository spots, ReservationRepository reservations, String parkingId,
-                       Clock clock, Consumer<SpotStateChanged> notifier) {
+    public SpotManager(SpotRepository spots, ReservationRepository reservations, ParkingRepository parkings,
+                       String parkingId, Clock clock, Consumer<SpotStateChanged> notifier) {
         this.spotRepository = spots;
         this.reservationRepository = reservations;
+        this.parkingRepository = parkings;
         this.parkingId = parkingId;
         this.clock = clock;
         this.notifier = notifier;
@@ -73,6 +79,13 @@ public class SpotManager {
             views.add(view(s, reserved.contains(s.id()), now));
         }
         return views;
+    }
+
+    /** GET /api/parking: the floor plan used by the PWA to draw the SVG map. */
+    public ParkingLayout layout() {
+        Parking parking = parkingRepository.findById(parkingId)
+                .orElseThrow(() -> new NotFoundException("Le parking " + parkingId + " n'existe pas encore."));
+        return new ParkingLayout(parking, spotRepository.findByParking(parkingId));
     }
 
     /** GET /api/spots/{id}. */

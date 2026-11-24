@@ -18,12 +18,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tn.supcom.smartparking.core.exception.InvalidRequestException;
 import tn.supcom.smartparking.core.exception.NotFoundException;
+import tn.supcom.smartparking.core.model.ForbiddenZone;
+import tn.supcom.smartparking.core.model.Parking;
+import tn.supcom.smartparking.core.model.PlanRect;
 import tn.supcom.smartparking.core.model.Point;
 import tn.supcom.smartparking.core.model.Reservation;
 import tn.supcom.smartparking.core.model.ReservationState;
 import tn.supcom.smartparking.core.model.Spot;
 import tn.supcom.smartparking.core.model.SpotState;
 import tn.supcom.smartparking.core.model.SpotType;
+import tn.supcom.smartparking.core.persistence.ParkingRepository;
 import tn.supcom.smartparking.core.persistence.ReservationRepository;
 import tn.supcom.smartparking.core.persistence.SpotRepository;
 
@@ -35,6 +39,7 @@ class SpotManagerTest {
 
     private final InMemorySpots spots = new InMemorySpots();
     private final InMemoryReservations reservations = new InMemoryReservations();
+    private final InMemoryParkings parkings = new InMemoryParkings();
     private final List<SpotStateChanged> sent = new ArrayList<>();
     private SpotManager manager;
 
@@ -46,7 +51,7 @@ class SpotManagerTest {
         spots.save(spot("B4", SpotType.ELECTRIC, SpotState.OCCUPIED, NOW.minusSeconds(61 * 60), 60));
         spots.save(new Spot("Z9", "P2", SpotType.STANDARD, 120, SQUARE, null, null, SpotState.FREE, null));
         reservations.open.add(Reservation.create("u_6543a1f0aabbccddeeff0011", "B3", NOW.minusSeconds(120), 15));
-        manager = new SpotManager(spots, reservations, "P1", Clock.fixed(NOW, ZoneOffset.UTC), sent::add);
+        manager = new SpotManager(spots, reservations, parkings, "P1", Clock.fixed(NOW, ZoneOffset.UTC), sent::add);
     }
 
     private static Spot spot(String id, SpotType type, SpotState state, Instant since, int maxMin) {
@@ -102,6 +107,21 @@ class SpotManagerTest {
     }
 
     @Test
+    void layoutHasThePlanOfTheConfiguredParking() {
+        parkings.save(new Parking("P1", "Maquette SUP'COM", 640, 480, 60, 40,
+                List.of(new ForbiddenZone("allee1", SQUARE, new PlanRect(50, 13, 10, 14))), null));
+        ParkingLayout layout = manager.layout();
+        assertEquals(60, layout.parking().widthCm());
+        assertEquals("allee1", layout.parking().forbiddenZones().get(0).id());
+        assertEquals(List.of("A1", "A2", "B3", "B4"), layout.spots().stream().map(Spot::id).toList());
+    }
+
+    @Test
+    void layoutWithoutParkingIsNotFound() {
+        assertThrows(NotFoundException.class, () -> manager.layout());
+    }
+
+    @Test
     void reservedCannotComeFromThePi() {
         assertThrows(InvalidRequestException.class, () -> manager.updateState("A1", SpotState.RESERVED, null));
         assertTrue(sent.isEmpty());
@@ -142,6 +162,20 @@ class SpotManagerTest {
             byId.put(id, new Spot(s.id(), s.parkingId(), s.type(), s.maxDurationMin(), s.polygon(),
                     s.planRect(), s.graphNode(), state, since));
             return true;
+        }
+    }
+
+    private static final class InMemoryParkings implements ParkingRepository {
+        private final Map<String, Parking> byId = new LinkedHashMap<>();
+
+        @Override
+        public Optional<Parking> findById(String id) {
+            return Optional.ofNullable(byId.get(id));
+        }
+
+        @Override
+        public void save(Parking parking) {
+            byId.put(parking.id(), parking);
         }
     }
 
