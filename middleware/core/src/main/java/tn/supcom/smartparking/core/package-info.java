@@ -5,6 +5,7 @@
  *   <li>{@code model} — domain records (Parking, Spot, Reservation, Event, Permission…)</li>
  *   <li>{@code persistence} — repository interfaces and their MongoDB implementations</li>
  *   <li>{@code calibration} — calibration manager, validator and mapper</li>
+ *   <li>{@code spots} — spots map: displayed states, summary, state changes (WebSocket)</li>
  *   <li>{@code exception} — business exceptions, mapped to HTTP errors by the API</li>
  *   <li>{@code config} — settings read through MicroProfile Config</li>
  * </ul>

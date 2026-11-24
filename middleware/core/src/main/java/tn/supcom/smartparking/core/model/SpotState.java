@@ -1,9 +1,13 @@
 package tn.supcom.smartparking.core.model;
 
-/** Occupancy state of a spot, sent by the Raspberry Pi (contract §5.1). */
+/**
+ * State of a spot. FREE and OCCUPIED are sent by the Raspberry Pi (contract §5.1) and stored in MongoDB.
+ * RESERVED is never stored: the server computes it for a free spot with an open reservation (contract §2.6).
+ */
 public enum SpotState {
     FREE("free"),
-    OCCUPIED("occupied");
+    OCCUPIED("occupied"),
+    RESERVED("reserved");
 
     private final String value;
 

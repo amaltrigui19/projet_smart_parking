@@ -1,8 +1,10 @@
 package tn.supcom.smartparking.core.persistence;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import tn.supcom.smartparking.core.model.Spot;
+import tn.supcom.smartparking.core.model.SpotState;
 
 /** Storage of parking spots. Implemented with MongoDB by {@link MongoSpotRepository}. */
 public interface SpotRepository {
@@ -21,4 +23,11 @@ public interface SpotRepository {
      * are missing from the list are deleted.
      */
     void replacePolygons(String parkingId, List<Spot> spots);
+
+    /**
+     * New occupancy state reported by the Pi (contract §5.1).
+     *
+     * @return false if the spot does not exist
+     */
+    boolean updateState(String id, SpotState state, Instant since);
 }
