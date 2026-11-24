@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr" data-app="back-office" data-service-worker="/admin/service-worker.js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plan en temps réel · Back office · Smart Parking</title>
+  <meta name="theme-color" content="#0b5d5d">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="/admin/manifest.json">
+  <link rel="icon" href="/shared/icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/shared/css/base.css">
+  <link rel="stylesheet" href="/shared/css/parking-map.css">
+</head>
+<!-- Hidden until the session is checked (shared/js/protected-page.js). The map is drawn by shared/js/live-map.js. -->
+<body hidden>
+  <header class="app-header">
+    <a href="/admin/dashboard.html" class="logo-link"><img src="/shared/icons/icon-192.png" alt="Tableau de bord" width="40" height="40"></a>
+    <h1>Smart Parking</h1>
+    <span class="app-label">Back office</span>
+    <span id="realtime-status" class="badge" role="status">Connexion…</span>
+  </header>
+
+  <div class="session-bar">
+    <span>Plan en temps réel · <strong id="user-name"></strong></span>
+    <button id="logout-button" class="button-secondary" type="button">Se déconnecter</button>
+  </div>
+
+  <main>
+    <section class="page-intro">
+      <h2>Plan du parking</h2>
+      <p>État des places en direct, tel que vu par la caméra du Pi.</p>
+
+      <p class="summary" aria-live="polite">
+        <span><strong id="count-free">–</strong> libres</span>
+        <span><strong id="count-occupied">–</strong> occupées</span>
+        <span><strong id="count-reserved">–</strong> réservées</span>
+      </p>
+
+      <div id="parking-map" class="parking-map"></div>
+
+      <ul class="legend">
+        <li><span class="swatch free"></span>Libre</li>
+        <li><span class="swatch occupied"></span>Occupée</li>
+        <li><span class="swatch reserved"></span>Réservée</li>
+      </ul>
+
+      <h3>Derniers changements</h3>
+      <ul id="change-log" class="change-log"></ul>
+    </section>
+  </main>
+
+  <footer class="app-footer">Smart Parking · Back office · SUP'COM</footer>
+
+  <script type="module" src="/shared/js/pwa.js"></script>
+  <script type="module" src="/shared/js/protected-page.js"></script>
+  <script type="module" src="/shared/js/live-map.js"></script>
+</body>
+</html>

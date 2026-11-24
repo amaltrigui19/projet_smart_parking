@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr" data-app="front-office" data-service-worker="/service-worker.js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Parking</title>
+  <meta name="description" content="Parking intelligent par vision par ordinateur : places libres en temps réel, guidage et réservation.">
+  <meta name="theme-color" content="#0b5d5d">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/shared/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/shared/icons/icon-192.png">
+  <link rel="stylesheet" href="/shared/css/base.css">
+</head>
+<body>
+  <header class="app-header">
+    <img src="/shared/icons/icon-192.png" alt="" width="40" height="40">
+    <h1>Smart Parking</h1>
+    <span id="network-status" class="badge" role="status">En ligne</span>
+  </header>
+
+  <main>
+    <section class="page-intro">
+      <h2>Trouvez une place sans tourner en rond</h2>
+      <p>Places libres en temps réel, guidage jusqu'à votre place et réservation à distance.</p>
+
+      <div class="cards">
+        <div class="card">
+          <strong>Places libres</strong>
+          <span>Le plan du parking se met à jour en direct</span>
+        </div>
+        <div class="card">
+          <strong>Réservation et guidage</strong>
+          <span>Réservez une place et laissez-vous guider jusqu'à elle</span>
+        </div>
+      </div>
+      <p><a id="app-link" class="button" href="/login.html">Se connecter ou créer un compte</a></p>
+
+      <button id="install-button" class="button" type="button" hidden>Installer l'application</button>
+    </section>
+  </main>
+
+  <footer class="app-footer">Smart Parking · Cloud of Things · SUP'COM</footer>
+
+  <script type="module" src="/shared/js/pwa.js"></script>
+  <script type="module" src="/js/home.js"></script>
+</body>
+</html>

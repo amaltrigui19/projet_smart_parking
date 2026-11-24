@@ -3,18 +3,18 @@
 
 const RESOLUTION = [640, 480];      // image de la caméra, en pixels (contrat 5.2)
 const DIMENSIONS_CM = [60, 40];     // maquette, en cm (contrat 4.3)
-const ECHELLE_X = RESOLUTION[0] / DIMENSIONS_CM[0];   // pixels par cm
-const ECHELLE_Y = RESOLUTION[1] / DIMENSIONS_CM[1];
+const SCALE_X = RESOLUTION[0] / DIMENSIONS_CM[0];   // pixels par cm
+const SCALE_Y = RESOLUTION[1] / DIMENSIONS_CM[1];
 
 // Polygone PROVISOIRE : le rectangle du plan converti en pixels, comme si la caméra était
 // parfaitement au-dessus de la maquette. Il sera remplacé par la vraie calibration.
-function polyDepuisRect([x, y, l, h]) {
-  const px = (v) => Math.round(v * ECHELLE_X);
-  const py = (v) => Math.round(v * ECHELLE_Y);
+function polygonFromRect([x, y, l, h]) {
+  const px = (v) => Math.round(v * SCALE_X);
+  const py = (v) => Math.round(v * SCALE_Y);
   return [[px(x), py(y)], [px(x + l), py(y)], [px(x + l), py(y + h)], [px(x), py(y + h)]];
 }
 
-const places = [
+const spots = [
   { id: "A1", type: "accessible", rect: [14, 0, 8, 13] },
   { id: "A2", type: "standard",   rect: [22, 0, 8, 13] },
   { id: "A3", type: "standard",   rect: [30, 0, 8, 13] },
@@ -33,14 +33,14 @@ db.parkings.replaceOne(
     resolution: RESOLUTION,
     dimensions_cm: DIMENSIONS_CM,
     forbidden_zones: [
-      { id: "allee1", polygon: polyDepuisRect([50, 13, 10, 14]), rect_cm: [50, 13, 10, 14] },
+      { id: "allee1", polygon: polygonFromRect([50, 13, 10, 14]), rect_cm: [50, 13, 10, 14] },
     ],
     updated_at: new Date(),
   },
   { upsert: true }
 );
 
-for (const p of places) {
+for (const p of spots) {
   db.spots.replaceOne(
     { _id: p.id },
     {
@@ -48,7 +48,7 @@ for (const p of places) {
       parking: "P1",
       type: p.type,
       max_duration_min: p.type === "electric" ? 60 : 120,
-      polygon: polyDepuisRect(p.rect),
+      polygon: polygonFromRect(p.rect),
       rect_cm: p.rect,
       node: p.id,
       state: "free",

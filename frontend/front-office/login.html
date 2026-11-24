@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr" data-app="front-office" data-service-worker="/service-worker.js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion · Smart Parking</title>
+  <meta name="theme-color" content="#0b5d5d">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/shared/icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="/shared/css/base.css">
+</head>
+<body>
+  <header class="app-header">
+    <a href="/" class="logo-link"><img src="/shared/icons/icon-192.png" alt="Accueil" width="40" height="40"></a>
+    <h1>Smart Parking</h1>
+    <span id="network-status" class="badge" role="status">En ligne</span>
+  </header>
+
+  <main>
+    <section class="auth-panel">
+      <div class="tabs" role="tablist" aria-label="Connexion ou inscription">
+        <button id="login-tab" class="tab" type="button" role="tab"
+                aria-selected="true" aria-controls="login-form">Connexion</button>
+        <button id="register-tab" class="tab" type="button" role="tab"
+                aria-selected="false" aria-controls="register-form">Créer un compte</button>
+      </div>
+
+      <div id="auth-message" class="message" role="status" aria-live="polite" hidden></div>
+
+      <form id="login-form" class="form" role="tabpanel" aria-labelledby="login-tab" novalidate>
+        <label>Email
+          <input name="email" type="email" autocomplete="username" required>
+        </label>
+        <label>Mot de passe
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="button" type="submit">Se connecter</button>
+      </form>
+
+      <form id="register-form" class="form" role="tabpanel" aria-labelledby="register-tab" novalidate hidden>
+        <label>Nom complet
+          <input name="name" type="text" autocomplete="name" required maxlength="100">
+        </label>
+        <label>Email
+          <input name="email" type="email" autocomplete="email" required>
+        </label>
+        <label>Mot de passe <span class="field-hint">(8 caractères minimum)</span>
+          <input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+        </label>
+        <label>Confirmer le mot de passe
+          <input name="confirmation" type="password" autocomplete="new-password" required>
+        </label>
+        <button class="button" type="submit">Créer mon compte</button>
+        <p class="note">Les comptes créés ici sont des comptes conducteur. Les opérateurs se connectent sur le <a href="/admin/">back office</a>.</p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="app-footer">Smart Parking · Cloud of Things · SUP'COM</footer>
+
+  <script type="module" src="/shared/js/pwa.js"></script>
+  <script type="module" src="/js/login.js"></script>
+</body>
+</html>
