@@ -67,6 +67,7 @@ jobs:
         run: |
           node frontend/tools/test_spot_validation.js
           node frontend/tools/test_realtime.mjs
+          node frontend/tools/test_parking_plan.mjs
 
       - name: Syntax check of every JavaScript file (front office, back office, shared)
         run: find frontend -name '*.js' -o -name '*.mjs' | xargs -n 1 node --check
