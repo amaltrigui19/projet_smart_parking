@@ -11,6 +11,7 @@
   --ground: #e3e7e5;
   --lane: #c9d0ce;
   --forbidden: #f3d3cf;
+  --spot-special: #1f5fbf;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,6 +23,7 @@
     --ground: #1f2928;
     --lane: #2b3836;
     --forbidden: #4a2723;
+    --spot-special: #6fa8ff;
   }
 }
 
@@ -40,6 +42,7 @@
 .parking-map .forbidden { fill: var(--forbidden); stroke: var(--spot-occupied); stroke-width: 0.2; stroke-dasharray: 0.8 0.6; }
 .parking-map [data-spot] > rect { stroke: var(--surface); stroke-width: 0.4; }
 .parking-map .spot-number { fill: #ffffff; font: bold 3px system-ui, sans-serif; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.parking-map [data-spot].special > rect { stroke: var(--spot-special); stroke-width: 0.8; }
 .parking-map .spot-type { fill: #ffffff; font: 2px system-ui, sans-serif; text-anchor: middle; pointer-events: none; }
 .parking-map .landmark { fill: var(--text-muted); font: bold 2.4px system-ui, sans-serif; text-anchor: middle; dominant-baseline: middle; }
 
@@ -49,6 +52,7 @@
 .swatch.free { background: var(--spot-free); }
 .swatch.occupied { background: var(--spot-occupied); }
 .swatch.reserved { background: var(--spot-reserved); }
+.swatch.special { background: transparent; border: 3px solid var(--spot-special); box-sizing: border-box; }
 
 .summary { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.5rem; margin: 0.5rem 0 1rem; }
 .summary strong { font-size: 1.4rem; }
