@@ -82,9 +82,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Same build as on the VM; the Dockerfile runs the tests again, so a red test also blocks the image.
+      # The WAR is compiled on the runner with the cached ~/.m2 (the tests already run in the
+      # "middleware" job). Building it inside Docker would download every dependency from Maven
+      # Central on each run, which the shared runner IPs get rate-limited for (HTTP 429).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build api.war
+        working-directory: middleware
+        run: mvn -B -ntp clean package -DskipTests
+
       - name: Build the WildFly image
-        run: docker build --tag smartparking-wildfly:ci middleware
+        run: >-
+          docker build --tag smartparking-wildfly:ci
+          --target war-precompile --build-context war=middleware/api/target
+          middleware
 
       - name: Check docker-compose.yml
         working-directory: server

@@ -62,10 +62,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The Dockerfile runs the JUnit tests: a red test means no image.
+      # The WAR is compiled on the runner with the cached ~/.m2: building it inside Docker would
+      # download every dependency from Maven Central and can fail with HTTP 429 (rate limit).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Runs the JUnit tests too (also when started by hand): a red test means no image.
+      - name: Build api.war and run the tests
+        working-directory: middleware
+        run: mvn -B -ntp clean package
+
       - uses: docker/build-push-action@v6
         with:
           context: middleware
+          target: war-precompile
+          build-contexts: war=middleware/api/target
           push: true
           tags: |
             ${{ steps.names.outputs.image }}
