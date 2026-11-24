@@ -6,14 +6,14 @@ Rédaction : Maissa (sprint 1, VM et HTTPS) et Eya (sprint 2, stack Docker sur l
 >
 > | | |
 > |---|---|
-> | URL | **https://smartparking-supcom.duckdns.org** (la PWA) ; l'API répond sur `/api/sante` |
+> | URL | **https://smartparking-supcom.duckdns.org** (la PWA) ; l'API répond sur `/api/health` |
 > | Hébergement | AWS EC2, région **eu-north-1** (Stockholm), instance `smart-parking-vm` |
 > | Machine | **t3.small** (2 vCPU, 2 Gio), Ubuntu Server 24.04 LTS, disque 20 Gio gp3, noyau Linux 7.0, swap de 2 Gio |
 > | Adresse | Elastic IP 13.49.171.243, nom DNS DuckDNS |
 > | Certificat | Let's Encrypt, **expire le 4 février 2027**, renouvelé automatiquement (`certbot.timer`, méthode **webroot**), copié dans `server/certs/` par `certbot-deploy-hook.sh` |
 > | Ports ouverts | **22** (SSH), **80** (HTTP → HTTPS), **443** (HTTPS), **8883** (MQTT en TLS) |
 > | Logiciels | Docker 29.9 et Compose 5.7 ; 4 conteneurs : `nginx`, `mqtt`, `mongo` (**7.0**, voir 4.4), `wildfly`. Le Nginx de l'hôte est **désactivé** |
-> | Vérification | `verifier.sh` : « Tout fonctionne. » (6 contrôles sur 6, le 10 novembre à 22:24 UTC) |
+> | Vérification | `check-server.sh` : « Tout fonctionne. » (6 contrôles sur 6, le 10 novembre à 22:24 UTC) |
 
 ## 0. Ce qui tournait avant, et ce qui tourne depuis le sprint 2
 
@@ -37,8 +37,8 @@ Raspberry Pi ─MQTT TLS 8883─▶ mqtt (Mosquitto)     mongo (127.0.0.1:27017)
 
 | Service | Image | Port ouvert | Rôle |
 |---|---|---|---|
-| `nginx` | `nginx:1.27-alpine` | 80, 443 | HTTPS, sert la PWA (`frontend/`), transmet `/api` à WildFly |
-| `wildfly` | construite depuis `middleware/` | aucun (derrière Nginx) | API Jakarta EE ; sprint 1 : `GET /api/sante` |
+| `nginx` | `nginx:1.27-alpine` | 80, 443 | HTTPS, sert le front office (`/`) et le back office (`/admin/`), transmet `/api` et le JWKS à WildFly |
+| `wildfly` | construite depuis `middleware/` | aucun (derrière Nginx) | API Jakarta EE ; sprint 1 : `GET /api/health` |
 | `mqtt` | `eclipse-mosquitto:2` | 8883 | Broker MQTT en TLS, comptes `pi` et `serveur` |
 | `mongo` | `mongo:8.0` (**7.0 sur la VM**, voir 4.4) | 27017, **sur 127.0.0.1 seulement** | Base de données, volume persistant `mongo-donnees` |
 
@@ -47,7 +47,7 @@ Deux voies, **avec les mêmes fichiers** :
 - **Voie B, locale** : sur le PC, avec un certificat d'une autorité locale → [section 2](#2-voie-b--environnement-local-docker-desktop).
 - **Voie A, VM AWS** : HTTPS en place → [section 3](#3-voie-a--vm-aws-procédure-réellement-appliquée), puis la stack Docker (faite le 10 novembre) → [section 4](#4-passage-à-la-stack-docker-sur-la-vm-appliqué-le-10-novembre).
 
-Entre les deux voies, seules changent l'origine des fichiers `server/certs/fullchain.pem` et `privkey.pem`, et la valeur de `DOMAINE` dans `.env`.
+Entre les deux voies, seules changent l'origine des fichiers `server/certs/fullchain.pem` et `privkey.pem`, et la valeur de `DOMAIN` dans `.env`.
 
 ---
 
@@ -57,17 +57,28 @@ Entre les deux voies, seules changent l'origine des fichiers `server/certs/fullc
 server/
 ├── docker-compose.yml          # les 4 services
 ├── .env.example                # modèle des secrets → copier en .env (jamais commité)
-├── nginx/nginx.conf            # HTTPS, redirection 80 → 443, proxy /api et /api/ws
+├── nginx/nginx.conf            # HTTPS, redirection 80 → 443, / et /admin/, proxy /api, /api/ws et JWKS
 ├── mosquitto/
 │   ├── mosquitto.conf          # TLS 8883, pas d'anonyme
-│   ├── acl                     # droits des comptes pi et serveur (contrat 5.3)
-│   └── demarrer.sh             # crée les mots de passe depuis .env puis lance le broker
+│   ├── acl                     # droits des comptes pi et server (contrat 5)
+│   └── start.sh                # crée les mots de passe depuis .env puis lance le broker
+├── mongo/                      # seed.js, index.js, examples.js, check-schema.js, read-back.js
 ├── scripts/
-│   ├── generer-certificats.sh  # CA locale + certificat serveur (openssl)
+│   ├── generate-certificates.sh  # CA locale + certificat serveur (openssl)
+│   ├── generate-jwt-keys.sh    # clés de signature des JWT (jwt/keys/<kid>.pem), rotation
 │   ├── certbot-deploy-hook.sh  # VM : installe le certificat Let's Encrypt
-│   └── verifier.sh             # 6 vérifications automatiques
+│   ├── deploy.sh               # VM : déploie une image WildFly (appelé par GitHub Actions)
+│   ├── check-server.sh         # 7 vérifications automatiques
+│   ├── test-auth.sh            # tests de l'IAM (register, login, me, JWKS)
+│   ├── test-polygons.sh        # tests de GET et PUT /api/config/polygons
+│   └── run-mongo.sh / .ps1     # lance un script de mongo/ dans le conteneur
 ├── certs/                      # créé par les scripts, ignoré par Git
+├── jwt/keys/                   # clés des JWT, ignoré par Git
 └── certbot-www/                # VM : défi Let's Encrypt, ignoré par Git
+frontend/
+├── front-office/               # application des conducteurs, servie sur /
+├── back-office/                # application des opérateurs, servie sur /admin/
+└── shared/                     # code et styles communs, servis sur /shared/
 middleware/                     # application Jakarta EE : modules iam, core, api (Dockerfile : Maven puis WildFly)
 ```
 
@@ -94,7 +105,7 @@ Toutes les commandes ci-dessous se tapent dans un terminal **Git Bash** (VS Code
 ```bash
 cp server/.env.example server/.env
 openssl rand -hex 16      # à lancer 3 fois : un mot de passe par ligne à remplacer
-code server/.env           # remplacer les 3 « a_remplacer » ; laisser DOMAINE=localhost
+code server/.env           # remplacer les 3 « a_remplacer » ; laisser DOMAIN=localhost
 ```
 
 Résultat attendu : `grep -c a_remplacer server/.env` affiche `0`.
@@ -102,7 +113,7 @@ Résultat attendu : `grep -c a_remplacer server/.env` affiche `0`.
 **Étape 2 : générer les certificats**
 
 ```bash
-./server/scripts/generer-certificats.sh
+./server/scripts/generate-certificates.sh
 ```
 
 Résultat attendu :
@@ -113,11 +124,19 @@ Certificat serveur créé : server/certs/fullchain.pem et server/certs/privkey.p
 Valable pour : DNS:localhost,IP:127.0.0.1,DNS:mqtt
 ```
 
-> Pour que le **Raspberry Pi** se connecte au broker du PC, ajouter l'adresse IP du PC : `./server/scripts/generer-certificats.sh 192.168.1.20` (adresse donnée par `ipconfig`), puis autoriser le port 8883 dans le pare-feu Windows. Copier `server/certs/ca.pem` sur le Pi (c'est un certificat public, pas un secret).
+> Pour que le **Raspberry Pi** se connecte au broker du PC, ajouter l'adresse IP du PC : `./server/scripts/generate-certificates.sh 192.168.1.20` (adresse donnée par `ipconfig`), puis autoriser le port 8883 dans le pare-feu Windows. Copier `server/certs/ca.pem` sur le Pi (c'est un certificat public, pas un secret).
 
 *Variante avec mkcert* (si vous préférez) : `winget install FiloSottile.mkcert`, `mkcert -install`, puis
 `mkcert -cert-file server/certs/fullchain.pem -key-file server/certs/privkey.pem localhost 127.0.0.1 mqtt` et
 `cp "$(mkcert -CAROOT)/rootCA.pem" server/certs/ca.pem`.
+
+**Étape 2 bis : créer la clé de signature des JWT**
+
+```bash
+./server/scripts/generate-jwt-keys.sh
+```
+
+Résultat attendu : `Clé JWT créée : server/jwt/keys/<AAAA-MM>.pem (kid = <AAAA-MM>, privée, PKCS#8)`. Le module IAM signe les jetons avec cette clé et publie sa partie publique sur `https://localhost/.well-known/jwks.json` ; l'API vérifie les jetons avec ce JWKS. Rotation des clés : `middleware/iam/README.md`.
 
 **Étape 3 (facultative) : faire confiance à la CA locale dans Windows**
 
@@ -150,10 +169,10 @@ La première fois, il faut 3 à 5 minutes (téléchargement des images, compilat
 **Automatique** (depuis la racine du dépôt, une trentaine de secondes après le démarrage, le temps que WildFly se lance) :
 
 ```bash
-./server/scripts/verifier.sh
+./server/scripts/check-server.sh
 ```
 
-Résultat attendu (sortie réelle du 6 novembre) :
+Résultat attendu (sortie réelle du 6 novembre, avant la refonte en anglais : `/api/sante` est devenu `/api/health`, et deux contrôles ont été ajoutés depuis, le back office `/admin/` et le JWKS) :
 
 ```
 1. HTTPS sur https://localhost/
@@ -195,8 +214,8 @@ X-Content-Type-Options: nosniff
 
 ```bash
 # API
-curl --ssl-no-revoke --cacert server/certs/ca.pem https://localhost/api/sante
-# → {"statut":"ok","version":"0.1.0","mongo":"ok","mqtt":"ok","ts":"..."}
+curl --ssl-no-revoke --cacert server/certs/ca.pem https://localhost/api/health
+# → {"status":"ok","version":"0.1.0","mongo":"ok","mqtt":"ok","ts":"..."}
 ```
 
 Test MQTT en TLS avec deux terminaux Git Bash. Les clients Mosquitto sont dans le conteneur, rien à installer. Remplacer `<MDP_…>` par les valeurs de `server/.env`.
@@ -225,9 +244,9 @@ Contrôles de sécurité :
 | `mosquitto_pub` sans `--cafile` sur le port 8883 (sans TLS) | `Error: Protocol error` |
 | Le compte `pi` publie sur `parking/P1/config` | rien n'arrive chez l'abonné (refus silencieux de l'ACL) |
 
-**Navigateur** : ouvrir `https://localhost` → la PWA s'affiche avec un cadenas (si l'étape 3 est faite) et propose l'installation. `https://localhost/api/sante` affiche le JSON.
+**Navigateur** : ouvrir `https://localhost` → la PWA s'affiche avec un cadenas (si l'étape 3 est faite) et propose l'installation. `https://localhost/api/health` affiche le JSON.
 
-**MongoDB** depuis le PC (MongoDB Compass, par exemple) : `mongodb://admin:<MONGO_MOT_DE_PASSE>@localhost:27017/?authSource=admin`.
+**MongoDB** depuis le PC (MongoDB Compass, par exemple) : `mongodb://admin:<MONGO_PASSWORD>@localhost:27017/?authSource=admin`.
 
 ### 2.4 Arrêter, relancer, tout effacer
 
@@ -515,7 +534,7 @@ Allumée en permanence, la VM coûterait environ 120 USD d'ici au 6 mai 2027, **
 
 ## 4. Passage à la stack Docker sur la VM (appliqué le 10 novembre)
 
-> **Appliqué le 10 novembre 2026** par Eya (sprint 2, profil A). Les étapes de 4.2 sont celles réellement suivies, avec trois écarts par rapport au plan initial, décrits en 4.4 (MongoDB 7.0, construction avant la coupure, `bash` pour `verifier.sh`).
+> **Appliqué le 10 novembre 2026** par Eya (sprint 2, profil A). Les étapes de 4.2 sont celles réellement suivies, avec trois écarts par rapport au plan initial, décrits en 4.4 (MongoDB 7.0, construction avant la coupure, `bash` pour `check-server.sh`).
 
 ### 4.1 Le problème, et l'option retenue
 
@@ -558,12 +577,12 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
    git clone https://github.com/amaltrigui19/projet_smart_parking.git /opt/smartparking
    cd /opt/smartparking/server
    cp .env.example .env && chmod 600 .env
-   sed -i 's/^DOMAINE=.*/DOMAINE=smartparking-supcom.duckdns.org/' .env
-   sed -i "s/^MONGO_MOT_DE_PASSE=.*/MONGO_MOT_DE_PASSE=$(openssl rand -hex 16)/" .env
-   sed -i "s/^MQTT_MDP_PI=.*/MQTT_MDP_PI=$(openssl rand -hex 16)/" .env
-   sed -i "s/^MQTT_MDP_SERVEUR=.*/MQTT_MDP_SERVEUR=$(openssl rand -hex 16)/" .env
+   sed -i 's/^DOMAIN=.*/DOMAIN=smartparking-supcom.duckdns.org/' .env
+   sed -i "s/^MONGO_PASSWORD=.*/MONGO_PASSWORD=$(openssl rand -hex 16)/" .env
+   sed -i "s/^MQTT_PASSWORD_PI=.*/MQTT_PASSWORD_PI=$(openssl rand -hex 16)/" .env
+   sed -i "s/^MQTT_PASSWORD_SERVER=.*/MQTT_PASSWORD_SERVER=$(openssl rand -hex 16)/" .env
    ```
-   Les mots de passe sont générés et écrits directement dans le fichier : ils ne s'affichent pas à l'écran. Vérification sans les montrer : `grep -c a_remplacer .env` → `0`, et `grep -E '^(MONGO_MOT_DE_PASSE|MQTT_MDP_PI|MQTT_MDP_SERVEUR)=.{32}$' .env | wc -l` → `3`. Le mot de passe `MQTT_MDP_PI` est à transmettre à la personne qui configure le Raspberry Pi, **par un canal privé** ; les deux autres ne quittent jamais la VM.
+   Les mots de passe sont générés et écrits directement dans le fichier : ils ne s'affichent pas à l'écran. Vérification sans les montrer : `grep -c a_remplacer .env` → `0`, et `grep -E '^(MONGO_PASSWORD|MQTT_PASSWORD_PI|MQTT_PASSWORD_SERVER)=.{32}$' .env | wc -l` → `3`. Le mot de passe `MQTT_PASSWORD_PI` est à transmettre à la personne qui configure le Raspberry Pi, **par un canal privé** ; les deux autres ne quittent jamais la VM.
 4. **Installer le script de copie du certificat et le lancer une fois.** Il copie `/etc/letsencrypt/live/smartparking-supcom.duckdns.org/{fullchain,privkey}.pem` dans `server/certs/`. Comme les conteneurs ne tournent pas encore, il ne recharge rien.
    ```bash
    sudo cp scripts/certbot-deploy-hook.sh /etc/letsencrypt/renewal-hooks/deploy/smartparking.sh
@@ -610,10 +629,10 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 8. **Tout vérifier** :
    ```bash
    sudo apt-get install -y mosquitto-clients
-   bash /opt/smartparking/server/scripts/verifier.sh smartparking-supcom.duckdns.org   # → "Tout fonctionne."
+   bash /opt/smartparking/server/scripts/check-server.sh smartparking-supcom.duckdns.org   # → "Tout fonctionne."
    ```
    On lance le script avec `bash` : après un `git clone` depuis Windows, il n'a pas le droit d'exécution (`Permission denied` avec `./`).
-   Depuis le PC : `curl -I https://smartparking-supcom.duckdns.org` → `200`, et https://smartparking-supcom.duckdns.org/api/sante → `{"statut":"ok",...}`.
+   Depuis le PC : `curl -I https://smartparking-supcom.duckdns.org` → `200`, et https://smartparking-supcom.duckdns.org/api/health → `{"status":"ok",...}`.
 
 **Retour en arrière** si quelque chose ne marche pas : `docker compose down`, puis `sudo systemctl enable --now nginx`. Le Nginx de l'hôte n'a pas été modifié.
 
@@ -623,7 +642,7 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 - La clé est lisible par le groupe 1883, l'utilisateur `mosquitto` du conteneur : `certbot-deploy-hook.sh` s'en charge.
 - À chaque renouvellement, le script recopie les fichiers, recharge Nginx et redémarre Mosquitto.
 - **Côté Raspberry Pi** : Let's Encrypt est reconnu par le système. On se connecte donc avec `--capath /etc/ssl/certs`, ou `tls_set()` sans argument en Python, sur `smartparking-supcom.duckdns.org:8883`. Aucun fichier de certificat n'est à copier sur le Pi.
-- **Sans Raspberry Pi** : le compte `pi` n'est qu'un nom et un mot de passe. N'importe quel poste peut jouer son rôle, et c'est ce que fait `verifier.sh` (contrôle 4).
+- **Sans Raspberry Pi** : le compte `pi` n'est qu'un nom et un mot de passe. N'importe quel poste peut jouer son rôle, et c'est ce que fait `check-server.sh` (contrôle 4).
 
 ### 4.4 Écarts par rapport au plan initial, et problèmes rencontrés (10 novembre)
 
@@ -631,7 +650,7 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 |---|---|---|
 | **MongoDB 8.0 refuse de démarrer** | Le conteneur `mongo` redémarrait en boucle (`Restarting (1)`). Journal : « MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility with this version of MongoDB » (fiche SERVER-121912, qui parle de « MongoDB 8.0+ »). Le noyau de la VM est le `7.0.0-1014-aws`. En local, Docker Desktop utilise un noyau plus ancien : d'où l'écart avec les tests de Maissa. | Fichier local **`server/docker-compose.override.yml`** qui impose `mongo:7.0` (Compose le charge tout seul). Il n'est **pas** dans Git : le problème ne concerne que le noyau de la VM. Si une base 8.0 a commencé à s'initialiser, supprimer d'abord son volume (`docker volume rm smartparking_mongo-donnees`) : une 7.0 ne peut pas ouvrir une base commencée par une 8.0. **À revoir** : si une version 8.x corrigée sort, retirer ce fichier. |
 | **Construction avant la coupure** | `docker compose up -d --build` aurait coupé le site pendant toute la construction (plusieurs minutes). | `pull` puis `build` pendant que l'ancien Nginx répond ; la coupure ne dure que le temps de `disable --now nginx` et `up -d`. |
-| **`verifier.sh` : `Permission denied`** | Les scripts n'ont pas le droit d'exécution après un clone depuis Windows. | Lancer avec `bash script.sh`. À corriger dans le dépôt (`git update-index --chmod=+x`) pour que `./script.sh` marche. |
+| **`check-server.sh` : `Permission denied`** | Les scripts n'ont pas le droit d'exécution après un clone depuis Windows. | Lancer avec `bash script.sh`. À corriger dans le dépôt (`git update-index --chmod=+x`) pour que `./script.sh` marche. |
 | **`installer = nginx` resté dans le renouvellement Certbot** | `certbot reconfigure` change la méthode (`webroot`) mais pas l'installateur. | Ligne supprimée (avec sauvegarde `.bak`), puis simulation de renouvellement réussie. |
 | **SSH coupé après l'ajout du port 8883** | La règle SSH (22) n'était plus dans le groupe de sécurité : `ssh` répondait `Connection timed out`, alors que le 443 passait. | Règle SSH (22, `0.0.0.0/0`) rajoutée. Voir 3.4 et 5.2. |
 
@@ -641,7 +660,7 @@ Conséquence à ne pas oublier : le renouvellement passe aujourd'hui par le **pl
 
 ### 4.5 Sortie du contrôle final
 
-Sortie de `verifier.sh` sur la VM, recopiée le 10 novembre 2026 :
+Sortie de `verifier.sh` (aujourd'hui `check-server.sh`) sur la VM, recopiée le 10 novembre 2026, avec les anciens noms :
 
 ```
 1. HTTPS sur https://smartparking-supcom.duckdns.org/
@@ -662,6 +681,20 @@ Tout fonctionne.
 
 ---
 
+### 4.6 Refonte en anglais : ce qui change sur la VM
+
+La refonte (noms en anglais, IAM avec JWKS, deux frontends) change trois choses sur la VM. `scripts/deploy.sh` les fait **tout seul** au premier déploiement par GitHub Actions, sans rien perdre :
+
+| Avant | Après | Fait par `deploy.sh` |
+|---|---|---|
+| `.env` : `DOMAINE`, `MONGO_UTILISATEUR`, `MONGO_MOT_DE_PASSE`, `MONGO_PORT_HOTE`, `MQTT_MDP_PI`, `MQTT_MDP_SERVEUR`, `EXPLOITANT_EMAIL`, `EXPLOITANT_MOT_DE_PASSE` | `DOMAIN`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_HOST_PORT`, `MQTT_PASSWORD_PI`, `MQTT_PASSWORD_SERVER`, `OPERATOR_EMAIL`, `OPERATOR_PASSWORD` | les clés sont renommées, les valeurs (mots de passe) gardées |
+| `jwt/privee.pem` (une seule clé) | `jwt/keys/<kid>.pem` (rotation) | si `jwt/keys/` est vide, la clé existante y est copiée sous le nom `<AAAA-MM>.pem` |
+| image WildFly construite sur la VM | image `ghcr.io/…/wildfly:<commit>` construite par GitHub Actions | ligne `WILDFLY_IMAGE=` écrite dans `.env` |
+
+Les volumes Docker gardent leurs noms (`smartparking_mongo-donnees`, `smartparking_mqtt-donnees`) : les données MongoDB et MQTT sont conservées. Le compte broker du serveur s'appelle maintenant `server` (au lieu de `serveur`) : il est recréé au démarrage de Mosquitto à partir de `MQTT_PASSWORD_SERVER`, rien à faire. Après la refonte, `docker-compose.override.yml` (MongoDB 7.0) reste en place.
+
+Les anciens comptes (PBKDF2) ne sont pas repris par l'IAM (`middleware/iam/README.md`) : le compte opérateur de démo est recréé au démarrage à partir de `OPERATOR_EMAIL` et `OPERATOR_PASSWORD`, les conducteurs se réinscrivent.
+
 ## 5. Dépannage
 
 ### 5.1 Environnement local (voie B)
@@ -670,16 +703,16 @@ Tout fonctionne.
 |---|---|---|
 | `failed to connect to the docker API … dockerDesktopLinuxEngine` | Docker Desktop n'est pas lancé | Lancer Docker Desktop, attendre que la baleine ne bouge plus |
 | Le navigateur affiche « Votre connexion n'est pas privée » sur https://localhost | La CA locale n'est pas reconnue par Windows | `certutil -user -addstore Root server\certs\ca.pem`, puis fermer et rouvrir le navigateur (étape 3 de 2.2) |
-| `curl: (60) schannel: … CERT_TRUST_REVOCATION_STATUS_UNKNOWN` (Windows) | Le curl de Windows cherche une liste de révocation que la CA locale n'a pas | Ajouter `--ssl-no-revoke` (fait par `verifier.sh`) |
+| `curl: (60) schannel: … CERT_TRUST_REVOCATION_STATUS_UNKNOWN` (Windows) | Le curl de Windows cherche une liste de révocation que la CA locale n'a pas | Ajouter `--ssl-no-revoke` (fait par `check-server.sh`) |
 | En PowerShell, `curl -I` donne une erreur de paramètre | `curl` = `Invoke-WebRequest` dans PowerShell 5 | Taper `curl.exe` |
 | `Error: Problem setting TLS options: File not found` avec `docker compose exec` dans Git Bash | Git Bash transforme `/mosquitto/...` en chemin Windows | Préfixer par `MSYS_NO_PATHCONV=1` |
 | `Bind for 0.0.0.0:443 failed: port is already allocated` | Un autre programme utilise 80, 443 ou 8883 | `netstat -ano \| findstr ":443 "` puis arrêter ce programme |
-| Nginx s'arrête : `cannot load certificate "/etc/nginx/certs/fullchain.pem"` | Certificats absents | `./server/scripts/generer-certificats.sh` puis `docker compose restart nginx` |
+| Nginx s'arrête : `cannot load certificate "/etc/nginx/certs/fullchain.pem"` | Certificats absents | `./server/scripts/generate-certificates.sh` puis `docker compose restart nginx` |
 | `502 Bad Gateway` sur `/api/...` | WildFly démarre encore (10 à 30 s) ou a planté | Attendre, puis `docker compose logs wildfly` |
-| `/api/sante` répond `503` avec `"mongo":"ko"` ou `"mqtt":"ko"` | Le service indiqué ne tourne pas | `docker compose ps`, puis `docker compose logs mongo` (ou `mqtt`) |
+| `/api/health` répond `503` avec `"mongo":"ko"` ou `"mqtt":"ko"` | Le service indiqué ne tourne pas | `docker compose ps`, puis `docker compose logs mongo` (ou `mqtt`) |
 | `Connection Refused: not authorised` (MQTT) | Mauvais mot de passe, ou `.env` modifié sans recréer le conteneur | Vérifier `.env`, puis `docker compose up -d --force-recreate mqtt` |
 | Un message MQTT publié n'arrive jamais | L'ACL interdit ce topic à ce compte (refus silencieux) | Vérifier `server/mosquitto/acl` et le contrat 5.3 |
-| Journaux de `mqtt` : `unexpected eof while reading` venant de WildFly | Normal : `/api/sante` vérifie seulement que le port 8883 répond, sans faire la négociation TLS | Rien à faire |
+| Journaux de `mqtt` : `unexpected eof while reading` venant de WildFly | Normal : `/api/health` vérifie seulement que le port 8883 répond, sans faire la négociation TLS | Rien à faire |
 | MongoDB refuse le nouveau mot de passe mis dans `.env` | Le compte admin n'est créé qu'au **premier** démarrage, sur un volume vide | Changer le mot de passe dans `mongosh`, ou `docker compose down -v` (efface les données) |
 | `$'\r': command not found` | Script enregistré avec des fins de ligne Windows (CRLF) | `.gitattributes` force LF ; sinon `sed -i 's/\r$//' <fichier>` |
 
@@ -700,7 +733,7 @@ Tout fonctionne.
 | Après le passage à Docker, `Bind for 0.0.0.0:80 failed` | Le Nginx de l'hôte tourne encore | `sudo systemctl disable --now nginx` |
 | La VM rame, WildFly redémarre seul | Mémoire pleine (2 Gio, sans swap) | Créer le swap (étape 1 de 4.2) ; `docker stats` |
 | `mongo` en `Restarting (1)` ; journal : `MongoDB cannot start: Linux kernel versions 6.19 and newer ...` | MongoDB 8.0 incompatible avec le noyau 6.19 ou plus récent (SERVER-121912) | `docker-compose.override.yml` avec `mongo:7.0` (voir 4.4), après avoir supprimé le volume vide `smartparking_mongo-donnees` |
-| `./server/scripts/verifier.sh` : `Permission denied` | Le script n'a pas le droit d'exécution après un clone depuis Windows | `bash server/scripts/verifier.sh <domaine>` |
+| `./server/scripts/check-server.sh` : `Permission denied` | Le script n'a pas le droit d'exécution après un clone depuis Windows | `bash server/scripts/check-server.sh <domaine>` |
 ---
 
 ## Annexe : alternative Azure

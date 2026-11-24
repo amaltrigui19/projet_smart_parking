@@ -100,17 +100,18 @@ pip install -r iot/requirements.txt
 
 Le format du fichier des places (polygones) est illustré par `iot/places.exemple.json`. Un test rapide du modèle est disponible dans `iot/test_yolo.py`.
 
-### Serveur et PWA
+### Serveur et frontends
 
-**Serveur en ligne : https://smartparking-supcom.duckdns.org** (VM AWS eu-north-1, HTTPS Let's Encrypt). Aujourd'hui, il sert la page d'accueil de Nginx ; la PWA et l'API (`/api`) y seront déployées au sprint 2.
+**Serveur en ligne : https://smartparking-supcom.duckdns.org** (VM AWS eu-north-1, HTTPS Let's Encrypt). Il sert le front office des conducteurs (`/`), le back office des opérateurs (`/admin/`) et l'API (`/api`). Chaque push sur `main` est testé puis déployé par GitHub Actions (voir [`server/README.md`](server/README.md), CI/CD).
 
 Tout le serveur (Nginx en HTTPS, Mosquitto en TLS, MongoDB, WildFly) se lance avec Docker, en local comme sur la VM cloud :
 
 ```bash
 cp server/.env.example server/.env        # puis remplir les mots de passe
-./server/scripts/generer-certificats.sh
+./server/scripts/generate-certificates.sh
+./server/scripts/generate-jwt-keys.sh
 cd server && docker compose up -d --build
-cd .. && ./server/scripts/verifier.sh     # → "Tout fonctionne."
+cd .. && ./server/scripts/check-server.sh     # → "Tout fonctionne."
 ```
 
 Procédure complète (voie locale, VM AWS réellement installée, passage à Docker au sprint 2) : [`docs/installation-serveur.md`](docs/installation-serveur.md).

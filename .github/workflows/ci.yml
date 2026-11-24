@@ -1,0 +1,107 @@
+# Continuous integration: builds and tests every pull request and every push to main.
+# A PR can only be merged once every job below is green (branch protection on main).
+#
+# Jobs:
+#   middleware  Maven build + JUnit tests of iam, core and api (JDK 21)
+#   frontend    tests of the PWA JavaScript modules and of the local test tools
+#   docker      builds the WildFly image and checks server/docker-compose.yml
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push on the same branch cancels the run that is still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  middleware:
+    name: Middleware (mvn verify)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: middleware
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build and run the tests
+        run: mvn -B -ntp clean verify
+
+      - name: Keep the test reports when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: middleware/*/target/surefire-reports/
+          retention-days: 7
+
+  frontend:
+    name: Frontend (JS + Python tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: JavaScript tests
+        run: |
+          node frontend/tools/test_spot_validation.js
+          node frontend/tools/test_realtime.mjs
+
+      - name: Syntax check of every JavaScript file (front office, back office, shared)
+        run: find frontend -name '*.js' -o -name '*.mjs' | xargs -n 1 node --check
+
+      - name: Python tests (fake API and fake real-time server)
+        run: |
+          python -m unittest -v frontend/tools/test_fake_api.py
+          python -m unittest -v frontend/tools/test_fake_realtime.py
+
+  docker:
+    name: Docker (image build + compose check)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same build as on the VM; the Dockerfile runs the tests again, so a red test also blocks the image.
+      - name: Build the WildFly image
+        run: docker build --tag smartparking-wildfly:ci middleware
+
+      - name: Check docker-compose.yml
+        working-directory: server
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+
+      # Same image and configuration as the stack; certificates and the "wildfly" host are faked for the test.
+      - name: Check nginx.conf
+        run: |
+          mkdir -p /tmp/certs
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
+            -keyout /tmp/certs/privkey.pem -out /tmp/certs/fullchain.pem 2>/dev/null
+          docker run --rm --add-host wildfly:127.0.0.1 \
+            -v "$PWD/server/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v /tmp/certs:/etc/nginx/certs:ro \
+            "$(grep -oE 'nginx:[0-9][^ ]*' server/docker-compose.yml)" nginx -t
+
+      - name: Shell scripts syntax
+        run: for f in server/scripts/*.sh server/mosquitto/start.sh; do bash -n "$f"; done
