@@ -6,9 +6,9 @@ COLLE de vraies voitures miniatures, découpées dans les photos « vues du dess
 (CC BY 4.0, citée dans iot/README.md). Comme on sait où chaque voiture est collée, les boîtes YOLO sont
 exactes : aucune annotation à la main.
 
-Ce que le générateur imite (iot/maquette.md) : plaque grise mate de 66 × 46 cm, ruban blanc de 1 cm,
+Ce que le générateur imite (iot/maquette.md) : plaque grise mate de 51 × 36 cm, lignes blanches de 6 mm,
 zone interdite allee1 hachurée, pictogrammes PMR (A1) et électrique (B4), numéros des places, caméra
-à la verticale en 640 × 480 (environ 9 px/cm), ombres et éclairage LED, petits défauts de cadrage.
+à la verticale en 640 × 480 (environ 12 px/cm), ombres et éclairage LED, petits défauts de cadrage.
 Les séries A à H du protocole sont reprises : vide, normal, à cheval, zone interdite, places spéciales,
 éclairage, angle, cas difficiles.
 
@@ -49,25 +49,25 @@ DATASET = ANNOTATION.parent / "dataset"
 DECOUPES_PAR_DEFAUT = DATASET / "synthetique" / "voitures"
 EXCLUSIONS_DECOUPES = ANNOTATION / "exclusions_decoupes.txt"
 
-# Plan du contrat (docs/contrats.md §4.1), en cm, origine en haut à gauche du cadre de 60 × 40
+# Plan du contrat (docs/contrats.md §4.1), en cm, origine en haut à gauche du cadre de 45 × 30
 PLACES = {
-    "A1": ((14, 0, 8, 13), "pmr", 120),
-    "A2": ((22, 0, 8, 13), "normale", 120),
-    "A3": ((30, 0, 8, 13), "normale", 120),
-    "A4": ((38, 0, 8, 13), "normale", 120),
-    "B1": ((14, 27, 8, 13), "normale", 120),
-    "B2": ((22, 27, 8, 13), "normale", 120),
-    "B3": ((30, 27, 8, 13), "normale", 120),
-    "B4": ((38, 27, 8, 13), "electrique", 60),
+    "A1": ((10, 0, 6, 10), "pmr", 120),
+    "A2": ((16, 0, 6, 10), "normale", 120),
+    "A3": ((22, 0, 6, 10), "normale", 120),
+    "A4": ((28, 0, 6, 10), "normale", 120),
+    "B1": ((10, 20, 6, 10), "normale", 120),
+    "B2": ((16, 20, 6, 10), "normale", 120),
+    "B3": ((22, 20, 6, 10), "normale", 120),
+    "B4": ((28, 20, 6, 10), "electrique", 60),
 }
-ZONES_INTERDITES = {"allee1": (50, 13, 10, 14)}
-PLAN = (60, 40)
-MARGE = 3                        # la plaque déborde de 3 cm autour du plan : 66 × 46 cm
-TABLE = (84, 64)                 # zone dessinée autour de la plaque (visible si la caméra bouge)
+ZONES_INTERDITES = {"allee1": (37, 10, 8, 10)}
+PLAN = (45, 30)
+MARGE = 3                        # la plaque déborde de 3 cm autour du plan : 51 × 36 cm
+TABLE = (69, 54)                 # zone dessinée autour de la plaque (visible si la caméra bouge)
 ORIGINE = ((TABLE[0] - PLAN[0]) / 2, (TABLE[1] - PLAN[1]) / 2)
 IMAGE = (640, 480)
-CHAMP_CM = 70                    # largeur vue par la caméra au réglage nominal (plaque entière + marge)
-R = 20                           # résolution du dessin, en pixels par cm (l'image finale en a environ 9)
+CHAMP_CM = 55                    # largeur vue par la caméra au réglage nominal (plaque entière + marge)
+R = 20                           # résolution du dessin, en pixels par cm (l'image finale en a environ 12)
 
 SERIES = {"A": 0.05, "B": 0.30, "C": 0.15, "D": 0.12, "E": 0.08, "F": 0.12, "G": 0.10, "H": 0.08}
 TEINTES = {"rouge": 0, "orange": 11, "jaune": 25, "vert": 62, "cyan": 92, "bleu": 112, "violet": 140}
@@ -232,7 +232,7 @@ def ruban(img, a, b, couleur, r, epaisseur_cm, bruit):
 
 
 def pictogramme(img, centre, genre, r):
-    cote = 4.0
+    cote = 3.0
     x0, y0 = px(centre[0] - cote / 2, centre[1] - cote / 2, r)
     s = cote * r
     cv2.rectangle(img, (int(x0), int(y0)), (int(x0 + s), int(y0 + s)), (242, 242, 242), -1)
@@ -282,9 +282,9 @@ def rendre_plaque(rng, r, sobre=False):
         return (240, 240, 240) if sobre else tuple(float(v) for v in rng.uniform(222, 250) + rng.normal(0, 3, 3))
 
     def epaisseur():
-        return 1.0 if sobre else rng.uniform(0.9, 1.1)
+        return 0.6 if sobre else rng.uniform(0.5, 0.7)
 
-    # Lignes des places (ruban blanc de 1 cm), chaque segment commun dessiné une seule fois
+    # Lignes des places (blanches, 6 mm), chaque segment commun dessiné une seule fois
     segments = set()
     for (x, y, w, h), _, _ in PLACES.values():
         for seg in (((x, y), (x + w, y)), ((x + w, y), (x + w, y + h)),
@@ -297,19 +297,19 @@ def rendre_plaque(rng, r, sobre=False):
     x, y, w, h = ZONES_INTERDITES["allee1"]
     couleur = (0, 200, 235) if sobre or rng.random() < 0.5 else (50, 50, 205)    # jaune ou rouge (BGR)
     calque = img.copy()
-    for k in np.arange(-h, w + h, 2.5):
-        cv2.line(calque, ipx(x + k, y, r), ipx(x + k + h, y + h, r), couleur, max(1, int(0.8 * r)), cv2.LINE_AA)
+    for k in np.arange(-h, w + h, 2.0):
+        cv2.line(calque, ipx(x + k, y, r), ipx(x + k + h, y + h, r), couleur, max(1, int(0.6 * r)), cv2.LINE_AA)
     zone = np.zeros(img.shape[:2], np.uint8)
     cv2.rectangle(zone, ipx(x, y, r), ipx(x + w, y + h, r), 255, -1)
     img[zone > 0] = calque[zone > 0]
     for a, b in (((x, y), (x + w, y)), ((x, y + h), (x + w, y + h)), ((x, y), (x, y + h))):
         ruban(img, a, b, couleur, r, epaisseur(), bruit)
 
-    pictogramme(img, (18, 3.5), "pmr", r)
-    pictogramme(img, (42, 36.5), "electrique", r)
+    pictogramme(img, (13, 2.5), "pmr", r)
+    pictogramme(img, (31, 27.5), "electrique", r)
 
     # Numéros sur le bord extérieur, hors des places
-    echelle, trait = 1.2 * r / 22, max(1, int(round(0.12 * r)))
+    echelle, trait = 0.9 * r / 22, max(1, int(round(0.12 * r)))
     for pid, ((x, y, w, h), _, _) in PLACES.items():
         (tw, _), _ = cv2.getTextSize(pid, POLICE, echelle, trait)
         base = -1.0 if pid[0] == "A" else PLAN[1] + 2.2
@@ -371,7 +371,7 @@ def angle_place(rng, ecart=10):
 
 def dans_place(pid, rng, decalage=0.0):
     (x, y, w, h), _, _ = PLACES[pid]
-    return (x + w / 2 + decalage + rng.uniform(-0.8, 0.8), y + h / 2 + rng.uniform(-1.2, 1.2)), angle_place(rng), "place"
+    return (x + w / 2 + decalage + rng.uniform(-0.6, 0.6), y + h / 2 + rng.uniform(-0.9, 0.9)), angle_place(rng), "place"
 
 
 def scene(serie, rng):
@@ -383,13 +383,13 @@ def scene(serie, rng):
         for _ in range(int(rng.integers(1, 3))):
             rangee, k = str(rng.choice(["A", "B"])), int(rng.integers(1, 4))
             (x, y, w, h), _, _ = PLACES[f"{rangee}{k}"]
-            poses.append(((x + w + rng.uniform(-1.8, 1.8), y + h / 2 + rng.uniform(-1, 1)),
+            poses.append(((x + w + rng.uniform(-1.3, 1.3), y + h / 2 + rng.uniform(-0.8, 0.8)),
                           float(rng.choice([0, 180]) + rng.uniform(-25, 25)), "cheval"))
             prises |= {f"{rangee}{k}", f"{rangee}{k + 1}"}
     if serie == "D":                                  # dans allee1, entière ou à moitié
         x, y, w, h = ZONES_INTERDITES["allee1"]
-        cx = rng.uniform(53, 57) if rng.random() < 0.6 else rng.uniform(47.5, 51)
-        poses.append(((cx, rng.uniform(y + 3, y + h - 3)),
+        cx = rng.uniform(40.5, 41.5) if rng.random() < 0.6 else rng.uniform(35.5, 38)
+        poses.append(((cx, rng.uniform(y + 2.5, y + h - 2.5)),
                       float(rng.choice([90, 270]) + rng.uniform(-15, 15)), "zone_interdite"))
     if serie == "E":                                  # places spéciales occupées
         for pid in [p for p in ("A1", "B4") if rng.random() < 0.7] or ["A1"]:
@@ -397,11 +397,11 @@ def scene(serie, rng):
             prises.add(pid)
     if serie == "H":                                  # voitures très proches
         rangee, k = str(rng.choice(["A", "B"])), int(rng.integers(1, 4))
-        poses.append(dans_place(f"{rangee}{k}", rng, decalage=1.3))
-        poses.append(dans_place(f"{rangee}{k + 1}", rng, decalage=-1.3))
+        poses.append(dans_place(f"{rangee}{k}", rng, decalage=1.0))
+        poses.append(dans_place(f"{rangee}{k + 1}", rng, decalage=-1.0))
         prises |= {f"{rangee}{k}", f"{rangee}{k + 1}"}
     if serie in "BEFGH" and rng.random() < (0.5 if serie == "H" else 0.12):    # voiture qui roule dans l'allée
-        poses.append(((rng.uniform(4, 44), rng.uniform(16.5, 23.5)),
+        poses.append(((rng.uniform(3, 33), rng.uniform(12.5, 17.5)),
                       float(rng.choice([90, 270]) + rng.uniform(-8, 8)), "allee"))
     n = int(rng.integers(0, 6)) if serie in "CDEH" else int(rng.choice([1, 2, 3, 4, 5, 6, 7, 8]))
     libres = [p for p in rng.permutation(list(PLACES)) if p not in prises]
@@ -475,7 +475,7 @@ def composer(serie, rng, decoupes):
     for centre, angle, role in poses:
         nom, bgra = decoupes[int(rng.integers(len(decoupes)))]
         couleur = "gris_clair" if serie == "H" and rng.random() < 0.4 else str(rng.choice(COULEURS))
-        longueur = rng.uniform(7.0, 10.5)
+        longueur = rng.uniform(6.3, 7.8)                  # 1/64, environ 7 cm
         largeur = longueur * rng.uniform(0.42, 0.5)
         emp = empreinte(centre, angle, longueur, largeur)
         if any(emp.buffer(0.2).intersects(e) for e in emprises):

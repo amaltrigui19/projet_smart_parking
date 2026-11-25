@@ -9,7 +9,7 @@ La maquette sert à trois choses :
 2. **la calibration** des polygones des places (outil `frontend/calibration.html`) ;
 3. **la démo** finale.
 
-Tout ce qui suit découle du plan validé (contrat §4) : 60 × 40 cm, 8 places, une allée centrale et une zone interdite `allee1`.
+Tout ce qui suit découle du plan validé (contrat §4) : 45 × 30 cm, 8 places de 6 × 10 cm pour des voitures au 1/64 (environ 7 cm), une allée centrale et une zone interdite `allee1`.
 
 ---
 
@@ -17,23 +17,23 @@ Tout ce qui suit découle du plan validé (contrat §4) : 60 × 40 cm, 8 places,
 
 | # | Élément | Quantité | Caractéristiques | Pourquoi |
 |---|---|---|---|---|
-| 1 | Plaque de fond | 1 | Carton épais, mousse EVA ou contreplaqué, **au moins 66 × 46 cm** (60 × 40 cm de maquette et 3 cm de marge de chaque côté), **gris moyen mat** (peinture ou papier gris non brillant) | Contraste avec les voitures, pas de reflets |
-| 2 | Ruban adhésif **blanc mat** | 1 rouleau | Largeur 1 cm (type ruban de masquage blanc ou ruban de marquage) | Lignes des places, nettes sur l'image |
+| 1 | Plaque de fond | 1 | Carton épais, mousse EVA ou contreplaqué, **au moins 51 × 36 cm** (45 × 30 cm de maquette et 3 cm de marge de chaque côté), **gris moyen mat** (peinture ou papier gris non brillant). Plus simple : coller le fond imprimé de `iot/impression/` (lignes, zone interdite et pictogrammes déjà dessinés), sur papier mat ; les lignes 2 à 4 ne servent alors plus | Contraste avec les voitures, pas de reflets |
+| 2 | Ruban adhésif **blanc mat** | 1 rouleau | Largeur 6 mm environ (type ruban de masquage blanc ou ruban de marquage) | Lignes des places, nettes sur l'image |
 | 3 | Ruban de couleur (jaune ou rouge) | 1 rouleau | Pour hachurer la zone interdite `allee1` | Zone interdite visible |
-| 4 | Pictogrammes | 2 | « PMR » (A1) et « borne électrique » (B4), imprimés en noir sur blanc, environ 4 × 4 cm | Repérer les places spéciales |
-| 5 | Voitures miniatures | **8 à 10** | Échelle **1/43** (≈ 10 × 4,5 cm) ou **1/64** (≈ 7,5 × 3,5 cm), qui tiennent dans une place de 8 × 13 cm. **Couleurs vives et variées** (rouge, bleu, jaune, blanc, vert, orange). **Pas de voiture noire ni gris foncé** | Le test S1 a montré des oublis sur les voitures sombres. 8 voitures pour remplir le parking, plus 1 ou 2 pour les cas « à cheval » et « zone interdite » |
+| 4 | Pictogrammes | 2 | « PMR » (A1) et « borne électrique » (B4), imprimés en noir sur blanc, environ 3 × 3 cm | Repérer les places spéciales |
+| 5 | Voitures miniatures | **8 à 10** | Échelle **1/64** (≈ 7 × 3 cm : Hot Wheels, Majorette), qui tiennent dans une place de 6 × 10 cm. **Couleurs vives et variées** (rouge, bleu, jaune, blanc, vert, orange). **Pas de voiture noire ni gris foncé** | Le test S1 a montré des oublis sur les voitures sombres. 8 voitures pour remplir le parking, plus 1 ou 2 pour les cas « à cheval » et « zone interdite » |
 | 6 | Caméra | 1 | Module caméra du Raspberry Pi (v2 ou v3) ou webcam USB | Prise de vue |
-| 7 | Support de caméra | 1 | **Rigide**, objectif **à la verticale** du centre de la maquette, hauteur réglable entre **55 et 70 cm** (potence, bras articulé, ou planche fixée sur deux montants) | Une caméra qui bouge oblige à redessiner les polygones |
+| 7 | Support de caméra | 1 | **Rigide**, objectif **à la verticale** du centre de la maquette, hauteur réglable entre **45 et 55 cm** (potence, bras articulé, ou planche fixée sur deux montants) | Une caméra qui bouge oblige à redessiner les polygones |
 | 8 | Éclairage | 2 | Lampes ou bandeaux **LED à lumière constante** (sans scintillement), placés **de chaque côté**, si possible diffusés (papier calque) | Pas d'ombre portée ni de reflet ; même image le matin et le soir |
 | 9 | Raspberry Pi 4 | 1 | 4 Go, carte microSD de 32 Go, alimentation USB-C 5 V / 3 A, dissipateur ou ventilateur | Prise de vue, puis inférence |
 | 10 | Petit matériel | — | Règle de 60 cm, équerre, crayon, cutter, ruban adhésif double face, serre-câbles | Construction |
 
-Hauteur de la caméra, pour voir toute la maquette avec sa marge (66 × 46 cm) :
-- module caméra **v2** : **≈ 55 cm** au minimum (angle de vue 62° × 49°) ;
-- module caméra **3** : **≈ 62 cm** au minimum (angle de vue 66° × 41°) ;
+Hauteur de la caméra, pour voir toute la maquette avec sa marge (51 × 36 cm) :
+- module caméra **v2** : **≈ 43 cm** au minimum (angle de vue 62° × 49°) ;
+- module caméra **3** : **≈ 48 cm** au minimum (angle de vue 66° × 41°) ;
 - webcam : à régler à l'œil avec la photo de test (étape 3.2).
 
-On vise 60 à 70 cm. Plus haut, les voitures deviennent trop petites sur l'image.
+On vise 45 à 55 cm. Plus haut, les voitures deviennent trop petites sur l'image.
 
 **Variante si le Raspberry Pi manque** (cahier des charges §4) : la même webcam branchée sur un ordinateur portable, avec le même `capture.py` (`--source opencv`). L'architecture ne change pas.
 
@@ -43,15 +43,17 @@ On vise 60 à 70 cm. Plus haut, les voitures deviennent trop petites sur l'image
 
 Repère : origine en haut à gauche, `x` vers la droite, `y` vers le bas, en centimètres.
 
-1. Tracer au crayon le cadre de **60 × 40 cm**, centré sur la plaque (3 cm de marge).
-2. **Allée centrale** : de `y = 13` à `y = 27` (14 cm de large), sur toute la largeur.
-3. **Rangée A** (en haut, de `y = 0` à `13`) et **rangée B** (en bas, de `y = 27` à `40`) : 4 places de **8 cm** de large chacune, aux `x` 14–22, 22–30, 30–38 et 38–46.
-4. Poser le **ruban blanc** sur les bords des places. Le ruban se pose **à l'extérieur** du trait, pour que chaque place garde 8 × 13 cm utiles.
+Avec le fond imprimé de `iot/impression/`, coller la feuille sur la plaque, vérifier l'échelle avec la barre de 10 cm et passer directement à la vérification. Sinon :
+
+1. Tracer au crayon le cadre de **45 × 30 cm**, centré sur la plaque (3 cm de marge).
+2. **Allée centrale** : de `y = 10` à `y = 20` (10 cm de large), sur toute la largeur.
+3. **Rangée A** (en haut, de `y = 0` à `10`) et **rangée B** (en bas, de `y = 20` à `30`) : 4 places de **6 cm** de large chacune, aux `x` 10–16, 16–22, 22–28 et 28–34.
+4. Poser le **ruban blanc** sur les bords des places. Le ruban se pose **centré** sur le trait entre deux places, et **à l'extérieur** sur le fond de la rangée.
 5. Pictogrammes : **PMR sur A1**, **électrique sur B4**.
-6. **Zone interdite `allee1`** : `x` de 50 à 60, `y` de 13 à 27, hachurée au ruban de couleur. Entrée à gauche, sortie à droite.
+6. **Zone interdite `allee1`** : `x` de 37 à 45, `y` de 10 à 20, hachurée au ruban de couleur. Entrée à gauche, sortie à droite.
 7. Écrire les numéros `A1`…`A4` et `B1`…`B4` **sur le bord extérieur**, hors des places, pour qu'ils ne gênent pas la détection.
 
-Vérification : mesurer chaque place (8 × 13 cm, ± 0,5 cm) et prendre une photo de la maquette vide **avant** de fixer la caméra.
+Vérification : mesurer chaque place (6 × 10 cm, ± 0,3 cm) et prendre une photo de la maquette vide **avant** de fixer la caméra.
 
 ---
 
@@ -71,7 +73,7 @@ Vérification : mesurer chaque place (8 × 13 cm, ± 0,5 cm) et prendre une phot
    À partir de là, on ne touche plus à la caméra. **Si elle bouge, il faut refaire la photo de calibration et redessiner les polygones.**
 5. Éclairage : allumer les deux LED et éteindre le plafonnier si possible. Vérifier sur une photo qu'il n'y a **ni ombre portée de la caméra ni reflet** sur les voitures.
 
-Résolution : **640 × 480** (environ 10 pixels par centimètre). C'est la résolution du contrat (§4.4) et de l'entraînement de YOLO.
+Résolution : **640 × 480** (environ 12 pixels par centimètre). C'est la résolution du contrat (§4.4) et de l'entraînement de YOLO.
 
 ---
 
@@ -128,8 +130,8 @@ B_normal,2026-11-16,10:12,2 LED,62,40,voiture rouge dans A3 sur 6 photos
 
 ## 5. C'est fini quand…
 
-- [ ] la maquette respecte le plan du contrat §4 (8 places de 8 × 13 cm, allée, `allee1`, PMR en A1, électrique en B4) ;
-- [ ] la caméra est fixée, verticale, entre 55 et 70 cm, et sa position est marquée ;
+- [ ] la maquette respecte le plan du contrat §4 (8 places de 6 × 10 cm, allée, `allee1`, PMR en A1, électrique en B4) ;
+- [ ] la caméra est fixée, verticale, entre 45 et 55 cm, et sa position est marquée ;
 - [ ] la photo de réglage montre tout le parking, net, sans ombre ni reflet ;
 - [ ] les séries A à H sont prises (≈ 140 photos), sans personne dans le champ, et le journal est rempli ;
 - [ ] une photo de la série A est transmise à Amal pour la calibration des polygones (`places.json`).

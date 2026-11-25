@@ -321,7 +321,7 @@ Le corps est facultatif (`from` vaut `E`, l'entrée, par défaut).
 ```json
 {
   "spot": "A2",
-  "distance_cm": 39.5,
+  "distance_cm": 29,
   "path": ["E", "I1", "I2", "A2"],
   "locked_until": "2026-11-20T10:08:00Z"
 }
@@ -623,42 +623,43 @@ Rédaction : Maissa, à valider par Amal (IoT) · Statut : proposition
 
 ### 4.1 Plan
 
-Maquette de **60 × 40 cm**, 8 places en deux rangées de part et d'autre d'une allée centrale. On entre à gauche et on sort à droite. Repère : origine en haut à gauche, `x` vers la droite, `y` vers le bas, en centimètres (même sens que le SVG de la PWA). Schéma à l'échelle (1 caractère = 1 cm en largeur) :
+Maquette de **45 × 30 cm**, 8 places en deux rangées de part et d'autre d'une allée centrale. On entre à gauche et on sort à droite. Repère : origine en haut à gauche, `x` vers la droite, `y` vers le bas, en centimètres (même sens que le SVG de la PWA). Schéma à l'échelle (1 caractère = 1 cm en largeur) :
 
 ```text
-x (cm)  0             14      22      30      38      46  50        60
-        +-------------+-------+-------+-------+-------+-------------+  y=0
-        |             |  A1   |  A2   |  A3   |  A4   |             |
-        |             | (PMR) |       |       |       |             |
-        |             |   o   |   o   |   o   |   o   |             |
-        +-------------+---|---+---|---+---|---+---|---+---+---------+  y=13
-ENTRÉE  E=================I1======I2======I3======I4======|#########S  SORTIE
-        |                 |       |       |       |       |# allee1#|
-        +-------------+---|---+---|---+---|---+---|---+---+---------+  y=27
-        |             |   o   |   o   |   o   |   o   |             |
-        |             |  B1   |  B2   |  B3   |  B4   |             |
-        |             |       |       |       |(ÉLEC) |             |
-        +-------------+-------+-------+-------+-------+-------------+  y=40
+x (cm)  0         10    16    22    28    34 37      45
+        +---------+-----+-----+-----+-----+----------+  y=0
+        |         | A1  | A2  | A3  | A4  |          |
+        |         |(PMR)|     |     |     |          |
+        |         |  o  |  o  |  o  |  o  |          |
+        +---------+--|--+--|--+--|--+--|--+--+-------+  y=10
+ENTRÉE  E============I1====I2====I3====I4====|#######S  SORTIE
+        |            |     |     |     |     |allee1#|
+        +---------+--|--+--|--+--|--+--|--+--+-------+  y=20
+        |         |  o  |  o  |  o  |  o  |          |
+        |         | B1  | B2  | B3  | B4  |          |
+        |         |     |     |     |(ÉLEC|          |
+        +---------+-----+-----+-----+-----+----------+  y=30
 ```
 
 Légende : `E` entrée, `S` sortie, `I1`…`I4` intersections de l'allée, `o` centre d'une place (nœud du graphe), `=` allée centrale, `#` zone interdite `allee1`.
 
-- **Places** : 8 cm × 13 cm, pour des voitures miniatures au 1/43 (environ 10 × 4,5 cm) ou au 1/64 (environ 7,5 × 3,5 cm).
+- **Places** : 6 cm × 10 cm, pour des voitures miniatures au 1/64 (environ 7 × 3 cm : Hot Wheels, Majorette). Il reste environ 1,5 cm de chaque côté et 3 cm en longueur, et une voiture peut se garer à cheval sur deux places.
 - **A1 = PMR** (la plus proche de l'entrée, côté rangée A), **B4 = électrique**, les autres sont normales.
-- **Allée centrale** : de `y = 13` à `y = 27` (14 cm de large).
-- **Zone interdite `allee1`** : la fin de l'allée devant la sortie, `x` de 50 à 60, `y` de 13 à 27. On peut y rouler, pas s'y arrêter.
-- Les bandes `x` de 0 à 14 et de 46 à 60 au-dessus et au-dessous de l'allée sont des trottoirs (non stationnables).
+- **Allée centrale** : de `y = 10` à `y = 20` (10 cm de large).
+- **Zone interdite `allee1`** : la fin de l'allée devant la sortie, `x` de 37 à 45, `y` de 10 à 20 (une voiture de 7 cm y tient en entier). On peut y rouler, pas s'y arrêter.
+- Les bandes `x` de 0 à 10 et de 34 à 45 au-dessus et au-dessous de l'allée sont des trottoirs (non stationnables).
+- Toutes les cotes sont des **centimètres entiers** : la maquette se trace à la règle, sans demi-centimètre.
 
 | Place | Type | `max_duration_min` | Rectangle `[x, y, largeur, hauteur]` (cm) | Nœud |
 |---|---|---|---|---|
-| A1 | pmr | 120 | `[14, 0, 8, 13]` | `A1` |
-| A2 | normale | 120 | `[22, 0, 8, 13]` | `A2` |
-| A3 | normale | 120 | `[30, 0, 8, 13]` | `A3` |
-| A4 | normale | 120 | `[38, 0, 8, 13]` | `A4` |
-| B1 | normale | 120 | `[14, 27, 8, 13]` | `B1` |
-| B2 | normale | 120 | `[22, 27, 8, 13]` | `B2` |
-| B3 | normale | 120 | `[30, 27, 8, 13]` | `B3` |
-| B4 | electrique | 60 | `[38, 27, 8, 13]` | `B4` |
+| A1 | pmr | 120 | `[10, 0, 6, 10]` | `A1` |
+| A2 | normale | 120 | `[16, 0, 6, 10]` | `A2` |
+| A3 | normale | 120 | `[22, 0, 6, 10]` | `A3` |
+| A4 | normale | 120 | `[28, 0, 6, 10]` | `A4` |
+| B1 | normale | 120 | `[10, 20, 6, 10]` | `B1` |
+| B2 | normale | 120 | `[16, 20, 6, 10]` | `B2` |
+| B3 | normale | 120 | `[22, 20, 6, 10]` | `B3` |
+| B4 | electrique | 60 | `[28, 20, 6, 10]` | `B4` |
 
 Pour la démo, l'exploitant pourra baisser `max_duration_min` à 2 minutes afin de montrer une alerte `overstay` sans attendre.
 
@@ -668,26 +669,26 @@ Nœuds (coordonnées en cm sur le plan) :
 
 | Nœud | Type | `x` | `y` | Rôle |
 |---|---|---|---|---|
-| `E` | entree | 0 | 20 | Entrée, départ du guidage |
-| `I1` | intersection | 18 | 20 | Devant A1 et B1 |
-| `I2` | intersection | 26 | 20 | Devant A2 et B2 |
-| `I3` | intersection | 34 | 20 | Devant A3 et B3 |
-| `I4` | intersection | 42 | 20 | Devant A4 et B4 |
-| `S` | sortie | 60 | 20 | Sortie |
-| `A1`…`A4` | place | 18, 26, 34, 42 | 6,5 | Centre de la place |
-| `B1`…`B4` | place | 18, 26, 34, 42 | 33,5 | Centre de la place |
+| `E` | entree | 0 | 15 | Entrée, départ du guidage |
+| `I1` | intersection | 13 | 15 | Devant A1 et B1 |
+| `I2` | intersection | 19 | 15 | Devant A2 et B2 |
+| `I3` | intersection | 25 | 15 | Devant A3 et B3 |
+| `I4` | intersection | 31 | 15 | Devant A4 et B4 |
+| `S` | sortie | 45 | 15 | Sortie |
+| `A1`…`A4` | place | 13, 19, 25, 31 | 5 | Centre de la place |
+| `B1`…`B4` | place | 13, 19, 25, 31 | 25 | Centre de la place |
 
 Arêtes (non orientées, longueur en cm) :
 
 | Arête | Longueur | Arête | Longueur |
 |---|---|---|---|
-| `E` – `I1` | 18 | `I1` – `A1`, `I1` – `B1` | 13,5 |
-| `I1` – `I2` | 8 | `I2` – `A2`, `I2` – `B2` | 13,5 |
-| `I2` – `I3` | 8 | `I3` – `A3`, `I3` – `B3` | 13,5 |
-| `I3` – `I4` | 8 | `I4` – `A4`, `I4` – `B4` | 13,5 |
-| `I4` – `S` | 18 | | |
+| `E` – `I1` | 13 | `I1` – `A1`, `I1` – `B1` | 10 |
+| `I1` – `I2` | 6 | `I2` – `A2`, `I2` – `B2` | 10 |
+| `I2` – `I3` | 6 | `I3` – `A3`, `I3` – `B3` | 10 |
+| `I3` – `I4` | 6 | `I4` – `A4`, `I4` – `B4` | 10 |
+| `I4` – `S` | 14 | | |
 
-Distances depuis `E` : A1 et B1 = 31,5 cm ; A2 et B2 = 39,5 ; A3 et B3 = 47,5 ; A4 et B4 = 55,5. À égalité, la règle de 2.7 choisit la rangée A. Exemple : tout est libre et le conducteur n'a pas d'autorisation PMR → A1 est exclue, B1 est proposée (trajet `E → I1 → B1`).
+Distances depuis `E` : A1 et B1 = 23 cm ; A2 et B2 = 29 ; A3 et B3 = 35 ; A4 et B4 = 41. À égalité, la règle de 2.7 choisit la rangée A. Exemple : tout est libre et le conducteur n'a pas d'autorisation PMR → A1 est exclue, B1 est proposée (trajet `E → I1 → B1`).
 
 ### 4.3 Format JSON (`GET /api/parking`, `GET` et `PUT /api/config/layout`)
 
@@ -695,41 +696,41 @@ Distances depuis `E` : A1 et B1 = 31,5 cm ; A2 et B2 = 39,5 ; A3 et B3 = 47,5 ; 
 {
   "parking": "P1",
   "name": "Maquette SUP'COM",
-  "dimensions_cm": [60, 40],
+  "dimensions_cm": [45, 30],
   "spots": [
-    { "id": "A1", "type": "accessible",        "rect_cm": [14, 0, 8, 13],  "node": "A1" },
-    { "id": "A2", "type": "standard",    "rect_cm": [22, 0, 8, 13],  "node": "A2" },
-    { "id": "A3", "type": "standard",    "rect_cm": [30, 0, 8, 13],  "node": "A3" },
-    { "id": "A4", "type": "standard",    "rect_cm": [38, 0, 8, 13],  "node": "A4" },
-    { "id": "B1", "type": "standard",    "rect_cm": [14, 27, 8, 13], "node": "B1" },
-    { "id": "B2", "type": "standard",    "rect_cm": [22, 27, 8, 13], "node": "B2" },
-    { "id": "B3", "type": "standard",    "rect_cm": [30, 27, 8, 13], "node": "B3" },
-    { "id": "B4", "type": "electric", "rect_cm": [38, 27, 8, 13], "node": "B4" }
+    { "id": "A1", "type": "accessible", "rect_cm": [10, 0, 6, 10],  "node": "A1" },
+    { "id": "A2", "type": "standard",   "rect_cm": [16, 0, 6, 10],  "node": "A2" },
+    { "id": "A3", "type": "standard",   "rect_cm": [22, 0, 6, 10],  "node": "A3" },
+    { "id": "A4", "type": "standard",   "rect_cm": [28, 0, 6, 10],  "node": "A4" },
+    { "id": "B1", "type": "standard",   "rect_cm": [10, 20, 6, 10], "node": "B1" },
+    { "id": "B2", "type": "standard",   "rect_cm": [16, 20, 6, 10], "node": "B2" },
+    { "id": "B3", "type": "standard",   "rect_cm": [22, 20, 6, 10], "node": "B3" },
+    { "id": "B4", "type": "electric",   "rect_cm": [28, 20, 6, 10], "node": "B4" }
   ],
-  "forbidden_zones": [ { "id": "allee1", "rect_cm": [50, 13, 10, 14] } ],
+  "forbidden_zones": [ { "id": "allee1", "rect_cm": [37, 10, 8, 10] } ],
   "graph": {
     "nodes": [
-      { "id": "E",  "type": "entrance",       "x": 0,  "y": 20 },
-      { "id": "I1", "type": "intersection", "x": 18, "y": 20 },
-      { "id": "I2", "type": "intersection", "x": 26, "y": 20 },
-      { "id": "I3", "type": "intersection", "x": 34, "y": 20 },
-      { "id": "I4", "type": "intersection", "x": 42, "y": 20 },
-      { "id": "S",  "type": "exit",       "x": 60, "y": 20 },
-      { "id": "A1", "type": "spot", "x": 18, "y": 6.5 },  { "id": "B1", "type": "spot", "x": 18, "y": 33.5 },
-      { "id": "A2", "type": "spot", "x": 26, "y": 6.5 },  { "id": "B2", "type": "spot", "x": 26, "y": 33.5 },
-      { "id": "A3", "type": "spot", "x": 34, "y": 6.5 },  { "id": "B3", "type": "spot", "x": 34, "y": 33.5 },
-      { "id": "A4", "type": "spot", "x": 42, "y": 6.5 },  { "id": "B4", "type": "spot", "x": 42, "y": 33.5 }
+      { "id": "E",  "type": "entrance",     "x": 0,  "y": 15 },
+      { "id": "I1", "type": "intersection", "x": 13, "y": 15 },
+      { "id": "I2", "type": "intersection", "x": 19, "y": 15 },
+      { "id": "I3", "type": "intersection", "x": 25, "y": 15 },
+      { "id": "I4", "type": "intersection", "x": 31, "y": 15 },
+      { "id": "S",  "type": "exit",         "x": 45, "y": 15 },
+      { "id": "A1", "type": "spot", "x": 13, "y": 5 },  { "id": "B1", "type": "spot", "x": 13, "y": 25 },
+      { "id": "A2", "type": "spot", "x": 19, "y": 5 },  { "id": "B2", "type": "spot", "x": 19, "y": 25 },
+      { "id": "A3", "type": "spot", "x": 25, "y": 5 },  { "id": "B3", "type": "spot", "x": 25, "y": 25 },
+      { "id": "A4", "type": "spot", "x": 31, "y": 5 },  { "id": "B4", "type": "spot", "x": 31, "y": 25 }
     ],
     "edges": [
-      { "from": "E",  "to": "I1", "length_cm": 18 },
-      { "from": "I1", "to": "I2", "length_cm": 8 },
-      { "from": "I2", "to": "I3", "length_cm": 8 },
-      { "from": "I3", "to": "I4", "length_cm": 8 },
-      { "from": "I4", "to": "S",  "length_cm": 18 },
-      { "from": "I1", "to": "A1", "length_cm": 13.5 }, { "from": "I1", "to": "B1", "length_cm": 13.5 },
-      { "from": "I2", "to": "A2", "length_cm": 13.5 }, { "from": "I2", "to": "B2", "length_cm": 13.5 },
-      { "from": "I3", "to": "A3", "length_cm": 13.5 }, { "from": "I3", "to": "B3", "length_cm": 13.5 },
-      { "from": "I4", "to": "A4", "length_cm": 13.5 }, { "from": "I4", "to": "B4", "length_cm": 13.5 }
+      { "from": "E",  "to": "I1", "length_cm": 13 },
+      { "from": "I1", "to": "I2", "length_cm": 6 },
+      { "from": "I2", "to": "I3", "length_cm": 6 },
+      { "from": "I3", "to": "I4", "length_cm": 6 },
+      { "from": "I4", "to": "S",  "length_cm": 14 },
+      { "from": "I1", "to": "A1", "length_cm": 10 }, { "from": "I1", "to": "B1", "length_cm": 10 },
+      { "from": "I2", "to": "A2", "length_cm": 10 }, { "from": "I2", "to": "B2", "length_cm": 10 },
+      { "from": "I3", "to": "A3", "length_cm": 10 }, { "from": "I3", "to": "B3", "length_cm": 10 },
+      { "from": "I4", "to": "A4", "length_cm": 10 }, { "from": "I4", "to": "B4", "length_cm": 10 }
     ]
   }
 }
@@ -743,13 +744,13 @@ Deux repères différents, reliés par l'identifiant des places et des zones :
 
 | Élément | Recommandation | Pourquoi |
 |---|---|---|
-| Fond | Carton ou mousse **mat, gris moyen** ; pas de surface brillante | Contraste avec les voitures, pas de reflets |
-| Marquage | Ruban adhésif **blanc mat** de 1 cm, sur les bords des places ; zone interdite hachurée | Repères visibles pour dessiner les polygones |
-| Voitures | 6 à 10 voitures de **couleurs vives** (rouge, bleu, jaune, blanc…) ; **pas de voiture noire** ni gris foncé | Le test S1 a montré des oublis sur les voitures sombres |
-| Caméra | **Fixée** sur un support rigide, objectif **perpendiculaire** au plan, à 60–70 cm de haut environ (à ajuster pour voir toute la maquette) | Une caméra qui bouge oblige à redessiner tous les polygones |
+| Fond | Carton ou mousse **mat, gris moyen** ; pas de surface brillante. Ou le fond imprimé de [`iot/impression/`](../iot/impression/generer_fond.py) (51 × 36 cm avec la marge, papier mat) | Contraste avec les voitures, pas de reflets |
+| Marquage | Lignes **blanches mates** de 6 mm (ruban ou impression), sur les bords des places ; zone interdite hachurée | Repères visibles pour dessiner les polygones |
+| Voitures | 6 à 10 voitures au **1/64** (environ 7 cm) de **couleurs vives** (rouge, bleu, jaune, blanc…) ; **pas de voiture noire** ni gris foncé | Le test S1 a montré des oublis sur les voitures sombres |
+| Caméra | **Fixée** sur un support rigide, objectif **perpendiculaire** au plan, à 45–55 cm de haut environ (à ajuster pour voir toute la maquette) | Une caméra qui bouge oblige à redessiner tous les polygones |
 | Cadrage | **Toutes les places entièrement visibles**, avec au moins 3 cm de marge autour de la maquette | Le test S1 a montré des oublis sur les voitures coupées au bord |
 | Éclairage | **LED constante et diffuse** (deux sources de chaque côté), pas de lumière du jour directe ni d'ombre portée de la caméra | Même image le matin et le soir, pas de fausses détections |
-| Résolution | 640 × 480 pour la détection (environ 10 pixels par cm) | Suffisant pour YOLO11n et rapide sur le Pi |
+| Résolution | 640 × 480 pour la détection (environ 12 pixels par cm) | Suffisant pour YOLO11n et rapide sur le Pi |
 
 Après toute modification de la caméra ou de la maquette : nouvelle photo de référence, puis nouveau dessin des polygones (`PUT /api/config/polygons`).
 
