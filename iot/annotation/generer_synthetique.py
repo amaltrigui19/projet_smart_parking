@@ -2,7 +2,7 @@
 Sprint 3 — Générer le lot 3 synthétique : la maquette vue du dessus par la caméra fixe.
 
 En attendant la vraie maquette, le script dessine des images 640 x 480 qui reprennent sa géométrie
-(contrat §4.3 : 60 x 40 cm, places A1-A4 et B1-B4 de 8 x 13 cm, allée centrale, zone interdite allee1)
+(contrat §4.3 : 45 x 30 cm, places A1-A4 et B1-B4 de 6 x 10 cm, allée centrale, zone interdite allee1)
 et y place des voitures miniatures vues du dessus. Les boîtes YOLO sont calculées en même temps que
 le dessin : elles sont exactes, il n'y a rien à annoter à la main.
 
@@ -32,12 +32,12 @@ import cv2
 import numpy as np
 
 LARGEUR, HAUTEUR = 640, 480                       # résolution de la caméra (contrat 5.2)
-MAQUETTE_CM = (60, 40)                             # dimensions de la maquette (contrat 4.3)
+MAQUETTE_CM = (45, 30)                             # dimensions de la maquette (contrat 4.3)
 PLACES_CM = {                                      # rect_cm du contrat 4.3 : x, y, largeur, hauteur
-    "A1": (14, 0, 8, 13), "A2": (22, 0, 8, 13), "A3": (30, 0, 8, 13), "A4": (38, 0, 8, 13),
-    "B1": (14, 27, 8, 13), "B2": (22, 27, 8, 13), "B3": (30, 27, 8, 13), "B4": (38, 27, 8, 13),
+    "A1": (10, 0, 6, 10), "A2": (16, 0, 6, 10), "A3": (22, 0, 6, 10), "A4": (28, 0, 6, 10),
+    "B1": (10, 20, 6, 10), "B2": (16, 20, 6, 10), "B3": (22, 20, 6, 10), "B4": (28, 20, 6, 10),
 }
-ZONE_INTERDITE_CM = (50, 13, 10, 14)               # allee1
+ZONE_INTERDITE_CM = (37, 10, 8, 10)                # allee1
 SORTIE_PAR_DEFAUT = Path(__file__).resolve().parent.parent / "dataset" / "lot3"
 PREFIXE = "synth_lot3_"
 # Couleurs de voitures (BGR), sans noir : le protocole de la maquette exclut les voitures noires
@@ -86,17 +86,17 @@ def dessiner_parking(img, matrice, echelle, rng):
         cv2.polylines(img, [pts], True, couleur_ligne, epaisseur, cv2.LINE_AA)
         if pid == "A1":                                   # place PMR : marquage bleu au sol
             x, y, l, h = rect
-            marque = vers_pixels(matrice, coins_rect(x + 2, y + 4, l - 4, h - 8)).astype(np.int32)
+            marque = vers_pixels(matrice, coins_rect(x + 1.5, y + 3, l - 3, h - 6)).astype(np.int32)
             cv2.fillPoly(img, [marque], (170, 90, 30), cv2.LINE_AA)
         if pid == "B4":                                   # place électrique : marquage vert
             x, y, l, h = rect
-            marque = vers_pixels(matrice, coins_rect(x + 2, y + 4, l - 4, h - 8)).astype(np.int32)
+            marque = vers_pixels(matrice, coins_rect(x + 1.5, y + 3, l - 3, h - 6)).astype(np.int32)
             cv2.fillPoly(img, [marque], (60, 150, 60), cv2.LINE_AA)
     # Zone interdite : contour et hachures
     x, y, l, h = ZONE_INTERDITE_CM
     cv2.polylines(img, [vers_pixels(matrice, coins_rect(x, y, l, h)).astype(np.int32)], True,
                   (40, 200, 230), epaisseur, cv2.LINE_AA)
-    for d in np.arange(0, l + h, 2.5):
+    for d in np.arange(0, l + h, 2.0):
         p1 = (x + max(0, d - h), y + min(h, d))
         p2 = (x + min(l, d), y + max(0, d - l))
         a, b = vers_pixels(matrice, [p1, p2]).astype(np.int32)
@@ -107,7 +107,7 @@ def dessiner_parking(img, matrice, echelle, rng):
 
 def dessiner_voiture(rng, echelle):
     """Voiture vue du dessus sur un calque transparent. Renvoie (calque BGR, masque 0-255)."""
-    longueur = int(rng.uniform(7.0, 10.0) * echelle)        # miniatures d'environ 7 à 10 cm
+    longueur = int(rng.uniform(6.3, 7.8) * echelle)         # miniatures au 1/64, environ 7 cm
     largeur = int(longueur * rng.uniform(0.42, 0.52))
     marge = int(longueur * 0.15)
     H, W = longueur + 2 * marge, largeur + 2 * marge
@@ -199,18 +199,18 @@ def choisir_voitures(rng):
         gauche, droite = f"{rangee}{i}", f"{rangee}{i + 1}"
         occupees = [p for p in occupees if p not in (gauche, droite)]
         x, y, l, h = PLACES_CM[droite]
-        voitures.append(((x + rng.uniform(-1.5, 1.5), y + h / 2 + rng.uniform(-1, 1)), rng.uniform(-12, 12), "cheval"))
+        voitures.append(((x + rng.uniform(-1.1, 1.1), y + h / 2 + rng.uniform(-0.8, 0.8)), rng.uniform(-12, 12), "cheval"))
         scenario = "cheval"
     for p in occupees:
         x, y, l, h = PLACES_CM[p]
-        centre = (x + l / 2 + rng.uniform(-1.2, 1.2), y + h / 2 + rng.uniform(-1.5, 1.5))
+        centre = (x + l / 2 + rng.uniform(-0.9, 0.9), y + h / 2 + rng.uniform(-1.1, 1.1))
         voitures.append((centre, rng.uniform(-10, 10) + rng.choice([0, 180]), "place"))
     if rng.random() < 0.18:                                  # voiture dans la zone interdite
         x, y, l, h = ZONE_INTERDITE_CM
-        voitures.append(((x + l / 2 + rng.uniform(-1, 1), y + h / 2 + rng.uniform(-1, 1)), rng.uniform(-20, 20), "zone_interdite"))
+        voitures.append(((x + l / 2 + rng.uniform(-0.6, 0.6), y + h / 2 + rng.uniform(-0.8, 0.8)), rng.uniform(-20, 20), "zone_interdite"))
         scenario = "zone_interdite" if scenario == "normal" else scenario + "+zone_interdite"
     if rng.random() < 0.15:                                  # voiture qui roule dans l'allée
-        voitures.append(((rng.uniform(4, 46), 20 + rng.uniform(-1.5, 1.5)), 90 + rng.uniform(-15, 15), "allee"))
+        voitures.append(((rng.uniform(3, 34), 15 + rng.uniform(-1.1, 1.1)), 90 + rng.uniform(-15, 15), "allee"))
     return voitures, scenario
 
 

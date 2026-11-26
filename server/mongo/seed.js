@@ -2,7 +2,7 @@
 // Relançable sans risque : chaque document est remplacé (upsert), rien n'est dupliqué.
 
 const RESOLUTION = [640, 480];      // image de la caméra, en pixels (contrat 5.2)
-const DIMENSIONS_CM = [60, 40];     // maquette, en cm (contrat 4.3)
+const DIMENSIONS_CM = [45, 30];     // maquette, en cm (contrat 4.3)
 const SCALE_X = RESOLUTION[0] / DIMENSIONS_CM[0];   // pixels par cm
 const SCALE_Y = RESOLUTION[1] / DIMENSIONS_CM[1];
 
@@ -15,14 +15,14 @@ function polygonFromRect([x, y, l, h]) {
 }
 
 const spots = [
-  { id: "A1", type: "accessible", rect: [14, 0, 8, 13] },
-  { id: "A2", type: "standard",   rect: [22, 0, 8, 13] },
-  { id: "A3", type: "standard",   rect: [30, 0, 8, 13] },
-  { id: "A4", type: "standard",   rect: [38, 0, 8, 13] },
-  { id: "B1", type: "standard",   rect: [14, 27, 8, 13] },
-  { id: "B2", type: "standard",   rect: [22, 27, 8, 13] },
-  { id: "B3", type: "standard",   rect: [30, 27, 8, 13] },
-  { id: "B4", type: "electric",   rect: [38, 27, 8, 13] },
+  { id: "A1", type: "accessible", rect: [10, 0, 6, 10] },
+  { id: "A2", type: "standard",   rect: [16, 0, 6, 10] },
+  { id: "A3", type: "standard",   rect: [22, 0, 6, 10] },
+  { id: "A4", type: "standard",   rect: [28, 0, 6, 10] },
+  { id: "B1", type: "standard",   rect: [10, 20, 6, 10] },
+  { id: "B2", type: "standard",   rect: [16, 20, 6, 10] },
+  { id: "B3", type: "standard",   rect: [22, 20, 6, 10] },
+  { id: "B4", type: "electric",   rect: [28, 20, 6, 10] },
 ];
 
 db.parkings.replaceOne(
@@ -33,7 +33,7 @@ db.parkings.replaceOne(
     resolution: RESOLUTION,
     dimensions_cm: DIMENSIONS_CM,
     forbidden_zones: [
-      { id: "allee1", polygon: polygonFromRect([50, 13, 10, 14]), rect_cm: [50, 13, 10, 14] },
+      { id: "allee1", polygon: polygonFromRect([37, 10, 8, 10]), rect_cm: [37, 10, 8, 10] },
     ],
     updated_at: new Date(),
   },
