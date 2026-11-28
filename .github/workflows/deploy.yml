@@ -75,7 +75,7 @@ jobs:
         working-directory: middleware
         run: mvn -B -ntp clean package
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: middleware
           target: war-precompile
