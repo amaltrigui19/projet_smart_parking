@@ -20,13 +20,13 @@
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
-            <version>5.14.0</version>
+            <version>5.15.0</version>
         </dependency>
         <!-- JWT et JWK (RS256, kid, JWKS) : bibliothèque reconnue, en Java pur -->
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-            <version>10.0.2</version>
+            <version>10.10</version>
         </dependency>
 
         <!-- Argon2id (hachage des mots de passe) : Bouncy Castle, en Java pur (pas de bibliothèque native dans Docker).
@@ -34,14 +34,14 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
-            <version>1.80</version>
+            <version>1.87</version>
         </dependency>
 
         <!-- MicroProfile Config (@ConfigProperty), fourni par WildFly à l'exécution -->
         <dependency>
             <groupId>org.eclipse.microprofile.config</groupId>
             <artifactId>microprofile-config-api</artifactId>
-            <version>3.1</version>
+            <version>3.1.3</version>
             <scope>provided</scope>
         </dependency>
 
@@ -55,14 +55,14 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.14.2</version>
+            <version>5.24.0</version>
             <scope>test</scope>
         </dependency>
         <!-- Implémentation de JSON-P pour les tests (WildFly fournit la sienne à l'exécution) -->
         <dependency>
             <groupId>org.eclipse.parsson</groupId>
             <artifactId>parsson</artifactId>
-            <version>1.1.7</version>
+            <version>1.1.9</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -72,7 +72,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.2</version>
+                <version>3.6.1</version>
             </plugin>
         </plugins>
     </build>
