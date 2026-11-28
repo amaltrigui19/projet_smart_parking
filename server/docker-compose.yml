@@ -44,7 +44,7 @@ services:
 
   # Base de données, données gardées dans un volume Docker
   mongo:
-    image: mongo:8.0.38
+    image: mongo:9.0.8
     restart: unless-stopped
     # Par défaut accessible seulement depuis la machine elle-même (voir .env)
     ports:
