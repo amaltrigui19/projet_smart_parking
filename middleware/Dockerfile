@@ -3,7 +3,7 @@
 
 # Étape 1 : compiler api.war avec Maven et lancer les tests JUnit (rien à installer sur le PC).
 # Si un test échoue, la construction s'arrête et aucune image n'est produite.
-FROM maven:3.9.16-eclipse-temurin-21 AS construction
+FROM maven:3.9-eclipse-temurin-26 AS construction
 WORKDIR /src
 COPY . .
 RUN mvn -q -B -ntp clean package
