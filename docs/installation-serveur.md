@@ -38,7 +38,7 @@ Raspberry Pi ─MQTT TLS 8883─▶ mqtt (Mosquitto)     mongo (127.0.0.1:27017)
 | Service | Image | Port ouvert | Rôle |
 |---|---|---|---|
 | `nginx` | `nginx:1.27-alpine` | 80, 443 | HTTPS, sert le front office (`/`) et le back office (`/admin/`), transmet `/api` et le JWKS à WildFly |
-| `wildfly` | construite depuis `middleware/` | aucun (derrière Nginx) | API Jakarta EE ; sprint 1 : `GET /api/health` |
+| `wildfly` | construite depuis `middleware/` et `frontend/` | aucun (derrière Nginx) | API Jakarta EE (`api.war`, sous `/api`) et les deux PWA (`ROOT.war` : `/` et `/admin/`, voir 6.1) |
 | `mqtt` | `eclipse-mosquitto:2` | 8883 | Broker MQTT en TLS, comptes `pi` et `serveur` |
 | `mongo` | `mongo:8.0` (**7.0 sur la VM**, voir 4.4) | 27017, **sur 127.0.0.1 seulement** | Base de données, volume persistant `mongo-donnees` |
 
@@ -735,6 +735,58 @@ Les anciens comptes (PBKDF2) ne sont pas repris par l'IAM (`middleware/iam/READM
 | `mongo` en `Restarting (1)` ; journal : `MongoDB cannot start: Linux kernel versions 6.19 and newer ...` | MongoDB 8.0 incompatible avec le noyau 6.19 ou plus récent (SERVER-121912) | `docker-compose.override.yml` avec `mongo:7.0` (voir 4.4), après avoir supprimé le volume vide `smartparking_mongo-donnees` |
 | `./server/scripts/check-server.sh` : `Permission denied` | Le script n'a pas le droit d'exécution après un clone depuis Windows | `bash server/scripts/check-server.sh <domaine>` |
 ---
+
+## 6. Remarques du prof (26 novembre) : WildFly et mises à jour
+
+### 6.1 Le frontend servi par WildFly (option A)
+
+Décision du groupe : **WildFly sert le front office, le back office et l'API** ; Nginx reste devant uniquement pour le HTTPS (certificat, HSTS, suites de chiffrement) et transmet tout à WildFly.
+
+L'image WildFly (`middleware/Dockerfile`) contient maintenant un deuxième déploiement, `ROOT.war` (contexte `/`), construit à partir de `frontend/` :
+
+| Dossier du dépôt | URL |
+|---|---|
+| `frontend/front-office/` | `/` |
+| `frontend/back-office/` | `/admin/` |
+| `frontend/shared/` | `/shared/` |
+| `api.war` (inchangé) | `/api` |
+
+Points techniques :
+- le contexte de construction reste `middleware/` ; `frontend/` arrive par un **contexte nommé** (`--build-context frontend=frontend`, `additional_contexts` dans `docker-compose.yml`, `build-contexts` dans `deploy.yml`) ;
+- la page d'accueil par défaut de WildFly occupait `/` : elle est retirée (jboss-cli, `location=/:remove`) ;
+- `middleware/web/WEB-INF/web.xml` : page d'accueil `index.html` et types MIME des PWA ;
+- la CI démarre l'image et vérifie que `/`, `/admin/`, `/shared/js/session.js` et les deux `manifest.json` répondent 200.
+
+**Reste à faire (Eya, `server/nginx/nginx.conf`)** : remplacer `root`, `alias /admin/` et `alias /shared/` par un `proxy_pass http://wildfly:8080` pour `/`, et retirer le volume `../frontend` du service `nginx`. Tant que ce n'est pas fait, Nginx continue de servir sa propre copie du frontend (rien ne casse).
+
+### 6.2 Mises à jour automatiques (Dependabot)
+
+Chaque lundi, Dependabot (`.github/dependabot.yml`) cherche de nouvelles versions et ouvre une PR par mise à jour :
+
+| Quoi | Fichier surveillé |
+|---|---|
+| Image WildFly | `middleware/Dockerfile` |
+| Nginx, MongoDB, Mosquitto | `server/docker-compose.yml` |
+| Librairies Java | `middleware/pom.xml` et modules (une PR groupée pour patch + minor) |
+| Actions GitHub | `.github/workflows/` (une PR groupée pour patch + minor) |
+
+Ensuite, sans intervention :
+
+1. la CI teste la PR (les 3 checks obligatoires) ;
+2. `.github/workflows/dependabot-auto-merge.yml` active la fusion automatique si la version est **patch ou minor** ; GitHub fusionne dès que les checks sont verts ;
+3. le push sur `main` relance la CI puis `deploy.yml`, qui déploie la nouvelle version sur la VM.
+
+Une version **majeure** (ex. WildFly 43, MongoDB 9) n'est jamais fusionnée seule : Dependabot laisse la PR ouverte avec un commentaire, à relire par un membre du groupe.
+
+**Réglages à faire une fois (propriétaire du dépôt) :**
+1. Settings → General → cocher **Allow auto-merge**.
+2. Créer un jeton *fine-grained* (Settings du compte → Developer settings → Fine-grained tokens), limité à ce dépôt, avec **Contents** et **Pull requests** en lecture/écriture.
+3. L'ajouter comme secret **Dependabot** (Settings → Secrets and variables → **Dependabot**, pas Actions) sous le nom `AUTOMERGE_TOKEN`.
+
+Pourquoi ce jeton : une fusion faite avec le `GITHUB_TOKEN` par défaut ne déclenche aucun workflow, donc ni CI ni déploiement sur `main`. Sans `AUTOMERGE_TOKEN`, la PR est quand même fusionnée, mais il faut lancer **Deploy** à la main.
+
+À vérifier à la première PR : le tag de l'image WildFly (`42.0.0.Final-1-jdk21`) n'est pas un numéro de version classique. Si Dependabot ne propose pas les nouvelles versions de WildFly, il faudra passer à Renovate pour cette image.
+
 
 ## Annexe : alternative Azure
 

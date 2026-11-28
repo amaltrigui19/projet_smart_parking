@@ -67,7 +67,11 @@ services:
     # Sur la VM : image construite par GitHub Actions et téléchargée depuis GHCR (WILDFLY_IMAGE est
     # écrit dans .env par scripts/deploy.sh). En local : non défini, « docker compose up -d --build » la construit.
     image: ${WILDFLY_IMAGE:-smartparking-wildfly:local}
-    build: ../middleware
+    build:
+      context: ../middleware
+      # frontend/ est copié dans l'image (ROOT.war) : WildFly sert les deux PWA
+      additional_contexts:
+        frontend: ../frontend
     restart: unless-stopped
     # Pas de port publié : on passe toujours par Nginx en HTTPS
     environment:

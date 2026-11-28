@@ -1,0 +1,43 @@
+# Automatic merge of Dependabot PRs (patch and minor versions only).
+# "gh pr merge --auto" does not merge right away: GitHub waits until the 3 required CI checks
+# of the branch protection are green. A red check = no merge, the PR stays open.
+#
+# Token: a merge made with the default GITHUB_TOKEN does not start new workflows, so CI and
+# Deploy would not run on main after the merge. The Dependabot secret AUTOMERGE_TOKEN
+# (fine-grained token: Contents + Pull requests read/write on this repository) avoids that.
+# Without it, the PR is still merged but the deployment must be started by hand.
+# Setup: docs/installation-serveur.md, section "Mises à jour automatiques".
+
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge (patch and minor)
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Major version, human review needed
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: >-
+          gh pr comment "$PR_URL" --body
+          "Major version (${{ steps.metadata.outputs.dependency-names }}): not merged automatically, please review."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

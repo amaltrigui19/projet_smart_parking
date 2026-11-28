@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ROOT.war: the two PWAs served by WildFly (context root "/").
+     Built by middleware/Dockerfile from the frontend/ folder:
+       frontend/front-office -> /         (drivers)
+       frontend/back-office  -> /admin/   (operators)
+       frontend/shared       -> /shared/  (code and styles used by both)
+     The REST API stays in api.war under /api. Nginx in front only does HTTPS. -->
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_1.xsd"
+         version="6.1">
+
+    <display-name>Smart Parking frontend</display-name>
+
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+    </welcome-file-list>
+
+    <!-- PWA manifests and ES modules -->
+    <mime-mapping>
+        <extension>webmanifest</extension>
+        <mime-type>application/manifest+json</mime-type>
+    </mime-mapping>
+    <mime-mapping>
+        <extension>mjs</extension>
+        <mime-type>text/javascript</mime-type>
+    </mime-mapping>
+
+    <!-- Static files only: no session cookie -->
+    <session-config>
+        <tracking-mode>COOKIE</tracking-mode>
+        <cookie-config>
+            <http-only>true</http-only>
+            <secure>true</secure>
+        </cookie-config>
+    </session-config>
+</web-app>

@@ -159,7 +159,8 @@ python frontend/outils/relire_polygones.py --url https://localhost --cacert serv
 ```
 middleware/
 ├── pom.xml                    # parent : Java 21, Jakarta EE 11, modules iam, core, api
-├── Dockerfile                 # Maven (compilation) puis WildFly ; contexte = ce dossier
+├── Dockerfile                 # Maven (compilation) puis WildFly : api.war (/api) + ROOT.war (frontend/, sous / et /admin/)
+├── web/WEB-INF/web.xml        # ROOT.war : page d'accueil et types MIME des deux PWA servies par WildFly
 ├── iam/                       # dépend de core (MongoConnection) et du driver mongodb-driver-sync 5.14.0
 │   ├── src/main/java/tn/supcom/smartparking/iam/
 │   │   ├── Utilisateur.java, Role.java

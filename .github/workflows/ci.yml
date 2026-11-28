@@ -99,7 +99,20 @@ jobs:
         run: >-
           docker build --tag smartparking-wildfly:ci
           --target war-precompile --build-context war=middleware/api/target
+          --build-context frontend=frontend
           middleware
+
+      # WildFly serves the two PWAs (ROOT.war, built from frontend/) next to api.war.
+      - name: Check that WildFly serves the frontend
+        run: |
+          docker run -d --name wildfly-ci -p 8080:8080 smartparking-wildfly:ci
+          for i in $(seq 1 60); do curl -fs -o /dev/null http://localhost:8080/ && break; sleep 2; done
+          for path in / /admin/ /shared/js/session.js /manifest.json /admin/manifest.json; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$path")
+            echo "$path -> $code"
+            if [ "$code" != 200 ]; then docker logs wildfly-ci | tail -60; exit 1; fi
+          done
+          docker rm -f wildfly-ci
 
       - name: Check docker-compose.yml
         working-directory: server

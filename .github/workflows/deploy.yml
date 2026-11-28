@@ -79,7 +79,9 @@ jobs:
         with:
           context: middleware
           target: war-precompile
-          build-contexts: war=middleware/api/target
+          build-contexts: |
+            war=middleware/api/target
+            frontend=frontend
           push: true
           tags: |
             ${{ steps.names.outputs.image }}
