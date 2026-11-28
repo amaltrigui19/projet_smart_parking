@@ -14,7 +14,7 @@ services:
 
   # Reverse proxy HTTPS : sert les deux frontends et transmet /api à WildFly
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.31-alpine
     restart: unless-stopped
     ports:
       - "80:80"
