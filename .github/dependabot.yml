@@ -1,0 +1,42 @@
+# Automatic updates: Dependabot checks every week for new versions and opens a PR for each one.
+# The CI tests the PR; patch and minor versions are then merged automatically
+# (.github/workflows/dependabot-auto-merge.yml) and deployed by deploy.yml.
+# Major versions (e.g. WildFly 43, MongoDB 9) stay open for a human review.
+
+version: 2
+
+updates:
+  # WildFly image (middleware/Dockerfile)
+  - package-ecosystem: docker
+    directory: /middleware
+    schedule:
+      interval: weekly
+      day: monday
+
+  # Nginx, MongoDB, Mosquitto (server/docker-compose.yml)
+  - package-ecosystem: docker-compose
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+
+  # Java libraries (middleware/pom.xml and its modules)
+  - package-ecosystem: maven
+    directory: /middleware
+    schedule:
+      interval: weekly
+      day: monday
+    # One PR for all patch and minor updates instead of one PR per library
+    groups:
+      maven-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Actions used by the workflows (.github/workflows/)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-minor-and-patch:
+        update-types: [minor, patch]
