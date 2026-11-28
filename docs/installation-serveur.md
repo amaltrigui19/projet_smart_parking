@@ -207,7 +207,7 @@ Résultat attendu :
 HTTP/1.1 200 OK
 Server: nginx
 Content-Type: text/html
-Strict-Transport-Security: max-age=86400
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
 X-Content-Type-Options: nosniff
 ...
 ```
