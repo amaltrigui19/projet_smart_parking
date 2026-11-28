@@ -15,8 +15,8 @@ flowchart LR
         direction TB
         subgraph docker ["«executionEnvironment» Docker"]
             direction TB
-            nginx["«container» nginx<br/>ports 80 et 443<br/>«artifact» frontend (PWA), proxy /api"]
-            wildfly["«executionEnvironment» WildFly<br/>port 8080, interne<br/>«artifact» api.war<br/>modules iam, core, api (architecture cible)"]
+            nginx["«container» nginx<br/>ports 80 et 443<br/>HTTPS, HSTS, proxy vers WildFly"]
+            wildfly["«executionEnvironment» WildFly<br/>port 8080, interne<br/>«artifact» ROOT.war : front office / et back office /admin/<br/>«artifact» api.war : /api (modules iam, core, api)"]
             mqtt["«container» Mosquitto<br/>port 8883, TLS<br/>comptes pi et serveur"]
             mongo["«container» MongoDB<br/>port 27017<br/>sur 127.0.0.1 seulement"]
         end
@@ -31,7 +31,7 @@ flowchart LR
     pi -->|"MQTT sur TLS, 8883"| mqtt
     nav -->|"HTTPS 443, JWT"| nginx
     nav -.->|"HTTP 80, redirigé vers HTTPS"| nginx
-    nginx -->|"proxy /api et /api/ws"| wildfly
+    nginx -->|"proxy /, /admin/, /api et /api/ws"| wildfly
     wildfly -->|"MongoDB, authentifié"| mongo
     wildfly -->|"abonné à parking/P1/#, publie parking/P1/config"| mqtt
     wildfly -.->|"Web Push, clés VAPID"| push
@@ -52,7 +52,7 @@ Notation : Mermaid n'a pas de diagramme de déploiement UML (nœuds en 3D). Les 
 | Élément | Détail |
 |---|---|
 | **Seuls `nginx` et `mqtt` sont joignables depuis Internet** | par les ports 80, 443 et 8883. |
-| **`wildfly` n'a aucun port publié** | on y accède uniquement par Nginx. |
+| **`wildfly` n'a aucun port publié** | on y accède uniquement par Nginx. Il sert les deux PWA (`ROOT.war`) et l'API (`api.war`) ; Nginx ne fait que le HTTPS (voir [`installation-serveur.md`](../installation-serveur.md) §6.1). |
 | **`mongo` n'écoute que sur `127.0.0.1`** | la base n'est pas exposée ; on s'y connecte par un tunnel SSH. |
 | **Un seul certificat** | celui de Let's Encrypt sert à Nginx (HTTPS) et à Mosquitto (TLS). |
 | **Aucune image ne quitte le Pi** | seuls l'état des places et les événements partent, en MQTT (*privacy by design*). |
